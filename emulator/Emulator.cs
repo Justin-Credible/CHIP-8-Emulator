@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 
 namespace JustinCredible.c8emu
 {
@@ -31,6 +32,14 @@ namespace JustinCredible.c8emu
         // Used by CXNN	(Rand) opcode to generate random numbers.
         private Random _random;
 
+        // If non-zero, decrements at 60hz. For use with the FX15 and FX07 opcodes.
+        // In otherwords, this decrements once for every 16.6 ms of time ellapsed between opcodes.
+        private byte _delayTimer;
+
+        // Used to measure time ellapsed between opcodes so we can update the _deplayTimer
+        // value. For use with the FX15 and FX07 opcodes.
+        private Stopwatch _delayTimerStopwatch;
+
         public Emulator()
         {
             this.Reset();
@@ -52,6 +61,15 @@ namespace JustinCredible.c8emu
 
             // Initialize the native random object which is used by the CXNN (Rand) opcode.
             _random = new Random();
+
+            // Reset the delay timer.
+
+            _delayTimer = 0x00;
+
+            if (_delayTimerStopwatch != null)
+                _delayTimerStopwatch.Stop();
+
+            _delayTimerStopwatch = new Stopwatch();
         }
 
         public void LoadMemory(byte[] memory)
@@ -97,6 +115,9 @@ namespace JustinCredible.c8emu
             while (true)
             {
                 incrementProgramCounter = true;
+
+                // Update the countdown timer used by FX07 and FX15 opcodes.
+                UpdateTimer();
 
                 // Fetch the next opcode.
                 UInt16 opcode = Fetch(_programCounter);
@@ -411,7 +432,8 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF0FF) == 0xF007)
                 {
                     // FX07	Timer	Vx = get_delay()	Sets VX to the value of the delay timer.
-                    // TODO
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    _registers[registerXIndex] = _delayTimer;
                 }
                 else if ((opcode & 0xF0FF) == 0xF00A)
                 {
@@ -421,7 +443,8 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF0FF) == 0xF015)
                 {
                     // FX15	Timer	delay_timer(Vx)	Sets the delay timer to VX.
-                    // TODO
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    _delayTimer = _registers[registerXIndex];
                 }
                 else if ((opcode & 0xF0FF) == 0xF018)
                 {
@@ -460,6 +483,11 @@ namespace JustinCredible.c8emu
                     // FX65	MEM	reg_load(Vx,&I)	Fills V0 to VX (including VX) with values from memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
                     // TODO
                 }
+                else if (opcode == 0xFFFF)
+                {
+                    // Temporary debugging opcode for writing to stdout.
+                    Console.WriteLine($"{DateTime.Now}: DEBUG opcode hit!");
+                }
                 else
                 {
                     throw new NotImplementedException(String.Format("Attempted to execute unknown opcode 0x{0:x} at memory address 0x{0:x}", opcode, _programCounter));
@@ -487,6 +515,55 @@ namespace JustinCredible.c8emu
             combined = combined | firstByteShifted;
 
             return (UInt16)combined;
+        }
+
+        private void UpdateTimer()
+        {
+            // Update the countdown timer.
+            // If the timer has already reached zero, then there is no work to do.
+            if (_delayTimer == 0x00)
+                return;
+
+            // If the stopwatch isn't running yet, but the delay timer has a value, then the last
+            // opcode must have been FX15 to set the value of the delay timer. So start measuring
+            // time ellapsed.
+            if (!_delayTimerStopwatch.IsRunning)
+            {
+                // Console.WriteLine("RESTART 1");
+                _delayTimerStopwatch.Restart();
+                return;
+            }
+
+            // To simulate the timer counting down at 60hz, we look at how much time has ellapsed
+            // since the last time we've been through the loop and divide by 16.6 milliseconds (60hz).
+            // This will be the amount we need to decrement the counter by.
+            var decrementBy = (int)Math.Floor(_delayTimerStopwatch.ElapsedMilliseconds / 16.6);
+
+            // It's possible that the last opcode took less than one millisecond to complete. In this
+            // case let the stopwatch continue to tick and accumulate time. NOTE: You can see fractional
+            // milliseconds ellapsed via _delayTimerStopwatch.Elapsed.TotalMilliseconds
+            if (decrementBy == 0)
+                return;
+
+            // If the stopwatch is running then we need to see how much has time ellapsed and update
+            // the delay timer value.
+
+            _delayTimerStopwatch.Stop();
+
+            if (decrementBy >= _delayTimer)
+            {
+                // If we're decrementing by the same or more than the counter, just set to zero.
+                // We're done counting down at this point, and can leave the stopwatch stopped.
+                _delayTimer = 0x00;
+            }
+            else
+            {
+                // Tick down by the number we calculated above.
+                _delayTimer = (byte)(_delayTimer - decrementBy);
+
+                // Reset back to zero and start measuring again.
+                _delayTimerStopwatch.Restart();
+            }
         }
     }
 }
