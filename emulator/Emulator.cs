@@ -124,25 +124,25 @@ namespace JustinCredible.c8emu
 
                 #if DEBUG
                 // Useful for adding to IDE's watched variables during debugging.
-                var d_opcode = String.Format("0x{0:X}", opcode);
-                var d_pc = String.Format("0x{0:X}", _programCounter);
-                var d_i = String.Format("0x{0:X}", _indexRegister);
-                var d_v0 = String.Format("0x{0:X}", _registers[0]);
-                var d_v1 = String.Format("0x{0:X}", _registers[1]);
-                var d_v2 = String.Format("0x{0:X}", _registers[2]);
-                var d_v3 = String.Format("0x{0:X}", _registers[3]);
-                var d_v4 = String.Format("0x{0:X}", _registers[4]);
-                var d_v5 = String.Format("0x{0:X}", _registers[5]);
-                var d_v6 = String.Format("0x{0:X}", _registers[6]);
-                var d_v7 = String.Format("0x{0:X}", _registers[7]);
-                var d_v8 = String.Format("0x{0:X}", _registers[8]);
-                var d_v9 = String.Format("0x{0:X}", _registers[9]);
-                var d_vA = String.Format("0x{0:X}", _registers[10]);
-                var d_vB = String.Format("0x{0:X}", _registers[11]);
-                var d_vC = String.Format("0x{0:X}", _registers[12]);
-                var d_vD = String.Format("0x{0:X}", _registers[13]);
-                var d_vE = String.Format("0x{0:X}", _registers[14]);
-                var d_vF = String.Format("0x{0:X}", _registers[15]);
+                var d_opcode = String.Format("0x{0:X4}", opcode);
+                var d_pc = String.Format("0x{0:X4}", _programCounter);
+                var d_i = String.Format("0x{0:X4}", _indexRegister);
+                var d_v0 = String.Format("0x{0:X2}", _registers[0]);
+                var d_v1 = String.Format("0x{0:X2}", _registers[1]);
+                var d_v2 = String.Format("0x{0:X2}", _registers[2]);
+                var d_v3 = String.Format("0x{0:X2}", _registers[3]);
+                var d_v4 = String.Format("0x{0:X2}", _registers[4]);
+                var d_v5 = String.Format("0x{0:X2}", _registers[5]);
+                var d_v6 = String.Format("0x{0:X2}", _registers[6]);
+                var d_v7 = String.Format("0x{0:X2}", _registers[7]);
+                var d_v8 = String.Format("0x{0:X2}", _registers[8]);
+                var d_v9 = String.Format("0x{0:X2}", _registers[9]);
+                var d_vA = String.Format("0x{0:X2}", _registers[10]);
+                var d_vB = String.Format("0x{0:X2}", _registers[11]);
+                var d_vC = String.Format("0x{0:X2}", _registers[12]);
+                var d_vD = String.Format("0x{0:X2}", _registers[13]);
+                var d_vE = String.Format("0x{0:X2}", _registers[14]);
+                var d_vF = String.Format("0x{0:X2}", _registers[15]);
                 #endif
 
                 // For the opcodes comments below.
@@ -191,7 +191,7 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF000) == 0x0000)
                 {
                     // 0NNN	Call		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
-                    throw new NotImplementedException(String.Format("RCA 1802 execution (opcode 0x{0:x}) not supported.", opcode));
+                    throw new NotImplementedException(String.Format("RCA 1802 execution (opcode 0x{0:X4}) not supported.", opcode));
                 }
                 else if ((opcode & 0xF000) == 0x1000)
                 {
@@ -490,7 +490,7 @@ namespace JustinCredible.c8emu
                 }
                 else
                 {
-                    throw new NotImplementedException(String.Format("Attempted to execute unknown opcode 0x{0:x} at memory address 0x{0:x}", opcode, _programCounter));
+                    throw new NotImplementedException(String.Format("Attempted to execute unknown opcode 0x{0:X4} at memory address 0x{0:X4}", opcode, _programCounter));
                 }
 
                 // Increment program counter by two bytes, to the next opcode.
