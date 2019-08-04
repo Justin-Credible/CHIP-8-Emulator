@@ -283,7 +283,6 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF000) == 0x7000)
                 {
                     // 7XNN	Const	Vx += NN	Adds NN to VX. (Carry flag is not changed)
-                    // TODO: "Carry flag is not changed" ???
                     var registerIndex = (opcode & 0x0F00) >> 8;
                     var value = _registers[registerIndex];
                     _registers[registerIndex] = (byte)(value + opcode);
@@ -326,22 +325,27 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF00F) == 0x8004)
                 {
                     // 8XY4	Math	Vx += Vy	Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
-                    // TODO
-                    // var registerXIndex = (opcode & 0x0F00) >> 8;
-                    // var registerYIndex = (opcode & 0x00F0) >> 4;
-                    // var valueX = _registers[registerXIndex];
-                    // var valueY = _registers[registerYIndex];
-                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+                    var result = valueX + valueY;
+                    var carryOccurred = (result & 0x0100) == 0x0100;
+                    _registers[15] = (byte)(carryOccurred ? 0x01 : 0x00);
+                    _registers[registerXIndex] = (byte)(result & 0x00FF);
                 }
                 else if ((opcode & 0xF00F) == 0x8005)
                 {
                     // 8XY5	Math	Vx -= Vy	VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
-                    // TODO
-                    // var registerXIndex = (opcode & 0x0F00) >> 8;
-                    // var registerYIndex = (opcode & 0x00F0) >> 4;
-                    // var valueX = _registers[registerXIndex];
-                    // var valueY = _registers[registerYIndex];
-                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                    // TODO: I'm not sure if this is correct for the borrow case; compare against another implementation.
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+                    var borrowOccurred = valueY > valueX;
+                    var result = valueX - valueY;
+                    _registers[15] = (byte)(borrowOccurred ? 0x00 : 0x01);
+                    _registers[registerXIndex] = (byte)(result & 0x00FF);
                 }
                 else if ((opcode & 0xF00F) == 0x8006)
                 {
@@ -356,12 +360,15 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF00F) == 0x8007)
                 {
                     // 8XY7	Math	Vx=Vy-Vx	Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
-                    // TODO
-                    // var registerXIndex = (opcode & 0x0F00) >> 8;
-                    // var registerYIndex = (opcode & 0x00F0) >> 4;
-                    // var valueX = _registers[registerXIndex];
-                    // var valueY = _registers[registerYIndex];
-                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                    // TODO: I'm not sure if this is correct for the borrow case; compare against another implementation.
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+                    var borrowOccurred = valueX > valueY;
+                    var result = valueY - valueX;
+                    _registers[15] = (byte)(borrowOccurred ? 0x00 : 0x01);
+                    _registers[registerXIndex] = (byte)(result & 0x00FF);
                 }
                 else if ((opcode & 0xF00F) == 0x800E)
                 {
