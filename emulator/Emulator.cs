@@ -1,0 +1,457 @@
+using System;
+
+namespace JustinCredible.c8emu
+{
+    class Emulator
+    {
+        private static readonly UInt16 MIN_STACK = 0xEA0;
+        private static readonly UInt16 MAX_STACK = 0xEFF;
+
+        // 4K of memory
+        private byte[] _memory = new byte[4096];
+
+        // Registers V0-VF
+        // V0-VE: general purpose
+        // VF: Used for special operations
+        // Each register is 1 byte (8 bits)
+        private byte[] _registers = new byte[16];
+
+        // Register I: Index / Address register
+        // 2 bytes (16 bits wide)
+        private UInt16 _indexRegister = 0x00;
+
+        // Program Counter is 2 bytes
+        // Possible values: 0x000 - 0xFFF
+        private UInt16 _programCounter = 0x000;
+
+        // Points to the top of the stack.
+        // The stack is reserved at memory locations 0xEA0-0xEFF.
+        private UInt16 _stackPointer = 0x000;
+
+        private Random _random = new Random();
+
+        public void LoadMemory(byte[] memory)
+        {
+            // TODO: Populate first 512 bytes with font data?
+            _memory = memory;
+        }
+
+        public void LoadRom(byte[] rom)
+        {
+            if (rom.Length > 3584)
+                throw new Exception("ROM filesize cannot exceed 3,584 bytes.");
+
+            var memory = new byte[4096];
+
+            // We skip the first 512 bytes which is where the CHIP-8 interpreter is stored on real hardware.
+            var memoryIndex = 512;
+
+            // Copy the bytes over.
+            for (var i = 0; i < rom.Length; i++)
+            {
+                memory[memoryIndex] = rom[i];
+                memoryIndex++;
+            }
+
+            LoadMemory(memory);
+        }
+
+        public void Run()
+        {
+            // The first 512 bytes are reserved for the interpreter on real hardware.
+            // Therefore program data starts at 512.
+            _programCounter = 0x200;
+
+            // Initialize the stack pointer.
+            _stackPointer = MIN_STACK;
+
+            // Indicates if we should increment the program counter by the standard 2 bytes
+            // after each fetch/decode/execute cycle. Some opcodes (jump etc) may modify the
+            // program counter directly, and therefore will want to skip this.
+            var incrementProgramCounter = true;
+
+            // Fetch, Decode, Execute until the program has completed.
+            while (true)
+            {
+                incrementProgramCounter = true;
+
+                // Fetch the next opcode.
+                UInt16 opcode = Fetch(_programCounter);
+
+                #if DEBUG
+                // Useful for adding to IDE's watched variables during debugging.
+                var d_opcode = String.Format("0x{0:X}", opcode);
+                var d_pc = String.Format("0x{0:X}", _programCounter);
+                var d_i = String.Format("0x{0:X}", _indexRegister);
+                var d_v0 = String.Format("0x{0:X}", _registers[0]);
+                var d_v1 = String.Format("0x{0:X}", _registers[1]);
+                var d_v2 = String.Format("0x{0:X}", _registers[2]);
+                var d_v3 = String.Format("0x{0:X}", _registers[3]);
+                var d_v4 = String.Format("0x{0:X}", _registers[4]);
+                var d_v5 = String.Format("0x{0:X}", _registers[5]);
+                var d_v6 = String.Format("0x{0:X}", _registers[6]);
+                var d_v7 = String.Format("0x{0:X}", _registers[7]);
+                var d_v8 = String.Format("0x{0:X}", _registers[8]);
+                var d_v9 = String.Format("0x{0:X}", _registers[9]);
+                var d_vA = String.Format("0x{0:X}", _registers[10]);
+                var d_vB = String.Format("0x{0:X}", _registers[11]);
+                var d_vC = String.Format("0x{0:X}", _registers[12]);
+                var d_vD = String.Format("0x{0:X}", _registers[13]);
+                var d_vE = String.Format("0x{0:X}", _registers[14]);
+                var d_vF = String.Format("0x{0:X}", _registers[15]);
+                #endif
+
+                // Decode and execute opcode.
+                if (opcode == 0x00EE)
+                {
+                    // 00EE	Flow	return;	Returns from a subroutine.
+
+                    // If the stack pointer was at the bottom of the stack and it was empty
+                    // then assume we weren't in a subroutine call and exit the program.
+                    if (_stackPointer == MIN_STACK && _memory[_stackPointer] == 0x0000)
+                        break; // Break out of the while(true) loop here; we're done!
+
+                    // TODO: TEST
+                    // Otherwise grab the address that the stack pointer is pointing to,
+                    // which is the subroutine return address.
+                    var returnAddress = Fetch(_stackPointer);
+
+                    // Clear out the value the stack pointer is pointing to.
+                    _memory[_stackPointer] = 0x0000;
+                    _memory[_stackPointer + 1] = 0x0000;
+
+                    // If we weren't at the minimum location, then move the stack pointer back.
+                    if (_stackPointer != MIN_STACK)
+                        _stackPointer = (UInt16)(_stackPointer - 0x0002);
+                }
+                else if (opcode == 0x00E0) // TODO
+                {
+                    // 00E0	Display	disp_clear()	Clears the screen.
+                    // TODO
+                }
+                else if ((opcode & 0xF000) == 0x0000)
+                {
+                    // 0NNN	Call		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
+                    // TODO
+                }
+                else if ((opcode & 0xF000) == 0x1000)
+                {
+                    // 1NNN	Flow	goto NNN;	Jumps to address NNN.
+                    var address = (opcode & 0x0FFF);
+                    _programCounter = (UInt16)address;
+                    incrementProgramCounter = false;
+                }
+                else if ((opcode & 0xF000) == 0x2000)
+                {
+                    // 2NNN	Flow	*(0xNNN)()	Calls subroutine at NNN.
+                    // TODO: TEST
+                    var address = opcode & 0x0FFF;
+
+                    if (_stackPointer == MAX_STACK)
+                    {
+                        throw new Exception("CHIP-8 stack overflow.");
+                    }
+
+                    // Increment the stack pointer (unless this we're at the bottom of the stack and it
+                    // is empty, which is a special case).
+                    if (_stackPointer != MIN_STACK || (_stackPointer == MIN_STACK && _memory[_stackPointer] != 0x0000))
+                        _stackPointer = (UInt16)(_stackPointer + 0x0002);
+
+                    // Store the address on the stack.
+                    _memory[_stackPointer] = (byte)((_programCounter & 0xFF00) >> 8);
+                    _memory[_stackPointer + 1] = (byte)(_programCounter & 0x00FF);
+
+                    // Jump to the given address.
+                    _programCounter = (UInt16)address;
+                    incrementProgramCounter = false;
+                }
+                else if ((opcode & 0xF000) == 0x3000)
+                {
+                    // 3XNN	Cond	if(Vx==NN)	Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block)
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var valueX = _registers[registerXIndex];
+                    var value = opcode & 0x00FF;
+
+                    if (valueX == value)
+                    {
+                        // Increment the program counter once for this instruction and a second
+                        // time because of the outcome of this opcode.
+                        _programCounter = (UInt16)(_programCounter + 0x0004);
+
+                        // We've already adjusted it, so don't do it again below.
+                        incrementProgramCounter = false;
+                    }
+                }
+                else if ((opcode & 0xF000) == 0x4000)
+                {
+                    // 4XNN	Cond	if(Vx!=NN)	Skips the next instruction if VX doesn't equal NN. (Usually the next instruction is a jump to skip a code block)
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var valueX = _registers[registerXIndex];
+                    var value = opcode & 0x00FF;
+
+                    if (valueX != value)
+                    {
+                        // Increment the program counter once for this instruction and a second
+                        // time because of the outcome of this opcode.
+                        _programCounter = (UInt16)(_programCounter + 0x0004);
+
+                        // We've already adjusted it, so don't do it again below.
+                        incrementProgramCounter = false;
+                    }
+                }
+                else if ((opcode & 0xF00F) == 0x5000)
+                {
+                    // 5XY0	Cond	if(Vx==Vy)	Skips the next instruction if VX equals VY. (Usually the next instruction is a jump to skip a code block)
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+
+                    if (valueX == valueY)
+                    {
+                        // Increment the program counter once for this instruction and a second
+                        // time because of the outcome of this opcode.
+                        _programCounter = (UInt16)(_programCounter + 0x0004);
+
+                        // We've already adjusted it, so don't do it again below.
+                        incrementProgramCounter = false;
+                    }
+                }
+                else if ((opcode & 0xF000) == 0x6000)
+                {
+                    // 6XNN	Const	Vx = NN	Sets VX to NN.
+                    var registerIndex = (opcode & 0x0F00) >> 8;
+                    var value = opcode & 0x00FF;
+                    _registers[registerIndex] = (byte)value;
+                }
+                else if ((opcode & 0xF000) == 0x7000)
+                {
+                    // 7XNN	Const	Vx += NN	Adds NN to VX. (Carry flag is not changed)
+                    // TODO: "Carry flag is not changed" ???
+                    var registerIndex = (opcode & 0x0F00) >> 8;
+                    var value = _registers[registerIndex];
+                    _registers[registerIndex] = (byte)(value + opcode);
+                }
+                else if ((opcode & 0xF00F) == 0x8000)
+                {
+                    // 8XY0	Assign	Vx=Vy	Sets VX to the value of VY.
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var value = _registers[registerXIndex];
+                    _registers[registerYIndex] = value;
+                }
+                else if ((opcode & 0xF00F) == 0x8001)
+                {
+                    // 8XY1	BitOp	Vx=Vx|Vy	Sets VX to VX or VY. (Bitwise OR operation)
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+                    _registers[registerXIndex] = (byte)(valueX | valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x8002)
+                {
+                    // 8XY2	BitOp	Vx=Vx&Vy	Sets VX to VX and VY. (Bitwise AND operation)
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+                    _registers[registerXIndex] = (byte)(valueX & valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x8003)
+                {
+                    // 8XY3	BitOp	Vx=Vx^Vy	Sets VX to VX xor VY.
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+                    _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x8004)
+                {
+                    // 8XY4	Math	Vx += Vy	Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+                    // TODO
+                    // var registerXIndex = (opcode & 0x0F00) >> 8;
+                    // var registerYIndex = (opcode & 0x00F0) >> 4;
+                    // var valueX = _registers[registerXIndex];
+                    // var valueY = _registers[registerYIndex];
+                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x8005)
+                {
+                    // 8XY5	Math	Vx -= Vy	VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+                    // TODO
+                    // var registerXIndex = (opcode & 0x0F00) >> 8;
+                    // var registerYIndex = (opcode & 0x00F0) >> 4;
+                    // var valueX = _registers[registerXIndex];
+                    // var valueY = _registers[registerYIndex];
+                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x8006)
+                {
+                    // 8XY6	BitOp	Vx>>=1	Stores the least significant bit of VX in VF and then shifts VX to the right by 1.
+                    // TODO
+                    // var registerXIndex = (opcode & 0x0F00) >> 8;
+                    // var registerYIndex = (opcode & 0x00F0) >> 4;
+                    // var valueX = _registers[registerXIndex];
+                    // var valueY = _registers[registerYIndex];
+                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x8007)
+                {
+                    // 8XY7	Math	Vx=Vy-Vx	Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+                    // TODO
+                    // var registerXIndex = (opcode & 0x0F00) >> 8;
+                    // var registerYIndex = (opcode & 0x00F0) >> 4;
+                    // var valueX = _registers[registerXIndex];
+                    // var valueY = _registers[registerYIndex];
+                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x800E)
+                {
+                    // 8XYE	BitOp	Vx<<=1	Stores the most significant bit of VX in VF and then shifts VX to the left by 1.
+                    // TODO
+                    // var registerXIndex = (opcode & 0x0F00) >> 8;
+                    // var registerYIndex = (opcode & 0x00F0) >> 4;
+                    // var valueX = _registers[registerXIndex];
+                    // var valueY = _registers[registerYIndex];
+                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                }
+                else if ((opcode & 0xF00F) == 0x9000)
+                {
+                    // 9XY0	Cond	if(Vx!=Vy)	Skips the next instruction if VX doesn't equal VY. (Usually the next instruction is a jump to skip a code block)
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueX = _registers[registerXIndex];
+                    var valueY = _registers[registerYIndex];
+
+                    if (valueX != valueY)
+                    {
+                        // Increment the program counter once for this instruction and a second
+                        // time because of the outcome of this opcode.
+                        _programCounter = (UInt16)(_programCounter + 0x0004);
+
+                        // We've already adjusted it, so don't do it again below.
+                        incrementProgramCounter = false;
+                    }
+                }
+                else if ((opcode & 0xF000) == 0xA000)
+                {
+                    // ANNN	MEM	I = NNN	Sets I to the address NNN.
+                    _indexRegister = (UInt16)(opcode & 0x0FFF);
+                }
+                else if ((opcode & 0xF000) == 0xB000)
+                {
+                    // BNNN	Flow	PC=V0+NNN	Jumps to the address NNN plus V0.
+                    var baseAddress = (UInt16)(opcode & 0x0FFF);
+                    var address = baseAddress + _registers[0];
+                    _programCounter = (UInt16)address;
+                    incrementProgramCounter = false;
+                }
+                else if ((opcode & 0xF000) == 0xC000)
+                {
+                    // CXNN	Rand	Vx=rand()&NN	Sets VX to the result of a bitwise and operation on a random number (Typically: 0 to 255) and NN.
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var value = (opcode & 0x00FF);
+                    _registers[registerXIndex] = (byte)(_random.Next() & value);
+                }
+                else if ((opcode & 0xF000) == 0xD000)
+                {
+                    // DXYN	Disp	draw(Vx,Vy,N)	Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height
+                    // of N pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value doesn’t change
+                    // after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped
+                    // from set to unset when the sprite is drawn, and to 0 if that doesn’t happen
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xE09E)
+                {
+                    // EX9E	KeyOp	if(key()==Vx)	Skips the next instruction if the key stored in VX is pressed. (Usually the next instruction is a jump to skip a code block)
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xE0A1)
+                {
+                    // EXA1	KeyOp	if(key()!=Vx)	Skips the next instruction if the key stored in VX isn't pressed. (Usually the next instruction is a jump to skip a code block)
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF007)
+                {
+                    // FX07	Timer	Vx = get_delay()	Sets VX to the value of the delay timer.
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF00A)
+                {
+                    // FX0A	KeyOp	Vx = get_key()	A key press is awaited, and then stored in VX. (Blocking Operation. All instruction halted until next key event)
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF015)
+                {
+                    // FX15	Timer	delay_timer(Vx)	Sets the delay timer to VX.
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF018)
+                {
+                    // FX18	Sound	sound_timer(Vx)	Sets the sound timer to VX.
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF01E)
+                {
+                    // FX1E	MEM	I +=Vx	Adds VX to I.
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF029)
+                {
+                    // FX29	MEM	I=sprite_addr[Vx]	Sets I to the location of the sprite for the character in VX. Characters 0-F (in hexadecimal) are represented by a 4x5 font.
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF033)
+                {
+                    // FX33	BCD	set_BCD(Vx);
+                    // *(I+0)=BCD(3);
+                    // *(I+1)=BCD(2);
+                    // *(I+2)=BCD(1);
+                    // Stores the binary-coded decimal representation of VX, with the most significant of three digits at the address
+                    // in I, the middle digit at I plus 1, and the least significant digit at I plus 2. (In other words, take the
+                    // decimal representation of VX, place the hundreds digit in memory at location in I, the tens digit at location
+                    // I+1, and the ones digit at location I+2.)
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF055)
+                {
+                    // FX55	MEM	reg_dump(Vx,&I)	Stores V0 to VX (including VX) in memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
+                    // TODO
+                }
+                else if ((opcode & 0xF0FF) == 0xF065)
+                {
+                    // FX65	MEM	reg_load(Vx,&I)	Fills V0 to VX (including VX) with values from memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
+                    // TODO
+                }
+                else
+                {
+                    throw new NotImplementedException(String.Format("Attempted to execute unknown opcode 0x{0:x} at memory address 0x{0:x}", opcode, _programCounter));
+                }
+
+                // Increment program counter by two bytes, to the next opcode.
+                if (incrementProgramCounter)
+                    _programCounter = (UInt16)(_programCounter + 0x0002);
+            }
+        }
+
+        private UInt16 Fetch(UInt16 pointer)
+        {
+            var firstByte = _memory[pointer];
+            var secondByte = _memory[pointer + 1];
+
+            int combined = 0x0000;
+
+            combined = combined | secondByte;
+
+            int firstByteExpanded = (int)firstByte;
+
+            int firstByteShifted = firstByteExpanded << 8;
+
+            combined = combined | firstByteShifted;
+
+            return (UInt16)combined;
+        }
+    }
+}
