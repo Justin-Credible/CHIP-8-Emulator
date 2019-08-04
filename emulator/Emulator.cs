@@ -349,13 +349,14 @@ namespace JustinCredible.c8emu
                 }
                 else if ((opcode & 0xF00F) == 0x8006)
                 {
-                    // 8XY6	BitOp	Vx>>=1	Stores the least significant bit of VX in VF and then shifts VX to the right by 1.
-                    // TODO
-                    // var registerXIndex = (opcode & 0x0F00) >> 8;
-                    // var registerYIndex = (opcode & 0x00F0) >> 4;
+                    // 8XY6	BitOp	Vx = Vy >> 1	Store the value of register VY shifted right one bit in register VX. Set register VF to the least significant bit prior to the shift.
+                    // NOTE: Wikipedia description is wrong. Search for "misconception" on this page: http://mattmik.com/files/chip8/mastering/chip8.html
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
                     // var valueX = _registers[registerXIndex];
-                    // var valueY = _registers[registerYIndex];
-                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                    var valueY = _registers[registerYIndex];
+                    _registers[registerXIndex] = (byte)(valueY >> 1);
+                    _registers[15] = (byte)(valueY & 0x01);
                 }
                 else if ((opcode & 0xF00F) == 0x8007)
                 {
@@ -372,13 +373,13 @@ namespace JustinCredible.c8emu
                 }
                 else if ((opcode & 0xF00F) == 0x800E)
                 {
-                    // 8XYE	BitOp	Vx<<=1	Stores the most significant bit of VX in VF and then shifts VX to the left by 1.
-                    // TODO
-                    // var registerXIndex = (opcode & 0x0F00) >> 8;
-                    // var registerYIndex = (opcode & 0x00F0) >> 4;
-                    // var valueX = _registers[registerXIndex];
-                    // var valueY = _registers[registerYIndex];
-                    // _registers[registerXIndex] = (byte)(valueX ^ valueY);
+                    // 8XYE	BitOp	Vx = Vy << 1    Store the value of register VY shifted left one bit in register VX. Set register VF to the most significant bit prior to the shift.
+                    // NOTE: Wikipedia description is wrong. Search for "misconception" on this page: http://mattmik.com/files/chip8/mastering/chip8.html
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var registerYIndex = (opcode & 0x00F0) >> 4;
+                    var valueY = _registers[registerYIndex];
+                    _registers[registerXIndex] = (byte)(valueY << 1);
+                    _registers[15] = (byte)(valueY & 0x80);
                 }
                 else if ((opcode & 0xF00F) == 0x9000)
                 {
