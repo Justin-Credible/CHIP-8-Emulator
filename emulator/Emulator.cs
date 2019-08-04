@@ -124,17 +124,26 @@ namespace JustinCredible.c8emu
                 var d_vF = String.Format("0x{0:X}", _registers[15]);
                 #endif
 
+                // For the opcodes comments below.
+                // NNN: address
+                // NN: 8-bit constant
+                // N: 4-bit constant
+                // X and Y: 4-bit register identifier
+                // PC : Program Counter
+                // I : 16bit register (For memory address) (Similar to void pointer)
+                // VN: One of the 16 available variables. N may be 0 to F (hexadecimal)
+
                 // Decode and execute opcode.
+                // There are 30 opcodes; each is two bytes and stored big-endian.
                 if (opcode == 0x00EE)
                 {
                     // 00EE	Flow	return;	Returns from a subroutine.
 
                     // If the stack pointer was at the bottom of the stack and it was empty
                     // then assume we weren't in a subroutine call and exit the program.
-                    if (_stackPointer == MIN_STACK && _memory[_stackPointer] == 0x0000)
+                    if (_stackPointer == MIN_STACK && Fetch(_stackPointer) == 0x0000)
                         break; // Break out of the while(true) loop here; we're done!
 
-                    // TODO: TEST
                     // Otherwise grab the address that the stack pointer is pointing to,
                     // which is the subroutine return address.
                     var returnAddress = Fetch(_stackPointer);
@@ -146,6 +155,12 @@ namespace JustinCredible.c8emu
                     // If we weren't at the minimum location, then move the stack pointer back.
                     if (_stackPointer != MIN_STACK)
                         _stackPointer = (UInt16)(_stackPointer - 0x0002);
+
+                    // Jump back to the return address.
+                    // This will return back to the 2NNN subroutine opcode which jumped us to
+                    // the subroutine in the first place, so we want to allow the PC to be
+                    // incremented below.
+                    _programCounter = returnAddress;
                 }
                 else if (opcode == 0x00E0) // TODO
                 {
@@ -155,7 +170,7 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF000) == 0x0000)
                 {
                     // 0NNN	Call		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
-                    // TODO
+                    throw new NotImplementedException(String.Format("RCA 1802 execution (opcode 0x{0:x}) not supported.", opcode));
                 }
                 else if ((opcode & 0xF000) == 0x1000)
                 {
@@ -167,17 +182,14 @@ namespace JustinCredible.c8emu
                 else if ((opcode & 0xF000) == 0x2000)
                 {
                     // 2NNN	Flow	*(0xNNN)()	Calls subroutine at NNN.
-                    // TODO: TEST
                     var address = opcode & 0x0FFF;
 
                     if (_stackPointer == MAX_STACK)
-                    {
                         throw new Exception("CHIP-8 stack overflow.");
-                    }
 
                     // Increment the stack pointer (unless this we're at the bottom of the stack and it
                     // is empty, which is a special case).
-                    if (_stackPointer != MIN_STACK || (_stackPointer == MIN_STACK && _memory[_stackPointer] != 0x0000))
+                    if (_stackPointer != MIN_STACK || (_stackPointer == MIN_STACK && Fetch(_stackPointer) != 0x0000))
                         _stackPointer = (UInt16)(_stackPointer + 0x0002);
 
                     // Store the address on the stack.
