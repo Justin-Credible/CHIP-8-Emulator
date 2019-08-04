@@ -8,27 +8,51 @@ namespace JustinCredible.c8emu
         private static readonly UInt16 MAX_STACK = 0xEFF;
 
         // 4K of memory
-        private byte[] _memory = new byte[4096];
+        private byte[] _memory;
 
         // Registers V0-VF
         // V0-VE: general purpose
         // VF: Used for special operations
         // Each register is 1 byte (8 bits)
-        private byte[] _registers = new byte[16];
+        private byte[] _registers;
 
         // Register I: Index / Address register
         // 2 bytes (16 bits wide)
-        private UInt16 _indexRegister = 0x00;
+        private UInt16 _indexRegister;
 
         // Program Counter is 2 bytes
         // Possible values: 0x000 - 0xFFF
-        private UInt16 _programCounter = 0x000;
+        private UInt16 _programCounter;
 
         // Points to the top of the stack.
         // The stack is reserved at memory locations 0xEA0-0xEFF.
-        private UInt16 _stackPointer = 0x000;
+        private UInt16 _stackPointer;
 
-        private Random _random = new Random();
+        // Used by CXNN	(Rand) opcode to generate random numbers.
+        private Random _random;
+
+        public Emulator()
+        {
+            this.Reset();
+        }
+
+        public void Reset()
+        {
+            // Initialize the regisgters and memory.
+            _indexRegister = 0x00;
+            _registers = new byte[16];
+            _memory = new byte[4096];
+
+            // The first 512 bytes are reserved for the interpreter on real hardware.
+            // Therefore program data starts at 512.
+            _programCounter = 0x200;
+
+            // Initialize the stack pointer.
+            _stackPointer = MIN_STACK;
+
+            // Initialize the native random object which is used by the CXNN (Rand) opcode.
+            _random = new Random();
+        }
 
         public void LoadMemory(byte[] memory)
         {
@@ -38,8 +62,14 @@ namespace JustinCredible.c8emu
 
         public void LoadRom(byte[] rom)
         {
-            if (rom.Length > 3584)
-                throw new Exception("ROM filesize cannot exceed 3,584 bytes.");
+            // Ensure the ROM data is not larger than we can load.
+            //  4096 : Total Memory (bytes)
+            // - 512 : First 512 reserved for interpreter
+            // - 256 : Uppermost 256 reserved for display refresh
+            // - 96  : 96 below that reserved for call stack, internal use, and other variables
+            //  3232 : Remaining available memory for user ROM
+            if (rom.Length > 3232)
+                throw new Exception("ROM filesize cannot exceed 3,232 bytes.");
 
             var memory = new byte[4096];
 
@@ -58,13 +88,6 @@ namespace JustinCredible.c8emu
 
         public void Run()
         {
-            // The first 512 bytes are reserved for the interpreter on real hardware.
-            // Therefore program data starts at 512.
-            _programCounter = 0x200;
-
-            // Initialize the stack pointer.
-            _stackPointer = MIN_STACK;
-
             // Indicates if we should increment the program counter by the standard 2 bytes
             // after each fetch/decode/execute cycle. Some opcodes (jump etc) may modify the
             // program counter directly, and therefore will want to skip this.
