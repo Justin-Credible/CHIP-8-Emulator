@@ -481,7 +481,11 @@ namespace JustinCredible.c8emu
                     // in I, the middle digit at I plus 1, and the least significant digit at I plus 2. (In other words, take the
                     // decimal representation of VX, place the hundreds digit in memory at location in I, the tens digit at location
                     // I+1, and the ones digit at location I+2.)
-                    // TODO
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var valueX = _registers[registerXIndex];
+                    _memory[_indexRegister] = (byte)DigitAtPosition(valueX, 3);
+                    _memory[_indexRegister + 1] = (byte)DigitAtPosition(valueX, 2);
+                    _memory[_indexRegister + 2] = (byte)DigitAtPosition(valueX, 1);
                 }
                 else if ((opcode & 0xF0FF) == 0xF055)
                 {
@@ -605,6 +609,17 @@ namespace JustinCredible.c8emu
                 // Reset back to zero and start measuring again.
                 _delayTimerStopwatch.Restart();
             }
+        }
+
+        private int DigitAtPosition(int number, int position)
+        {
+            // Calculate the divisor; this division shifts the digit we're looking
+            // for to the right until it is in the ones position.
+            var divisor = (int)Math.Pow(10, position - 1);
+
+            // Use the modulo operator to divide by 10 and get the remainder, which
+            // will be the digit in the ones position.
+            return (number / divisor) % 10;
         }
     }
 }
