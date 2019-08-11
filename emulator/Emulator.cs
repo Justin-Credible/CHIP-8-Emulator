@@ -12,6 +12,14 @@ namespace JustinCredible.c8emu
         // Step should not be called again without first calling Reset.
         public bool Finished { get; private set; }
 
+        // For storing the pixels to be displayed. The CHIP-8 has a resolution of 64x32 with
+        // monochrome color. This is a two dimensional array where each byte represents a pixel.
+        // A zero indicates an empty pixel and one indicates a filled in pixel.
+        public byte[,] FrameBuffer { get; private set; }
+
+        // The CHIP-8 could only play a single beep sound. This flag indicates one should be played.
+        public bool PlaySound { get; private set; }
+
         // 4K of memory
         private byte[] _memory;
 
@@ -74,6 +82,9 @@ namespace JustinCredible.c8emu
 
             // Reset the flag that indicates that the ROM has finished executing.
             Finished = false;
+
+            // Reset the frame buffer (clear the screen).
+            FrameBuffer = new byte[64, 32];
         }
 
         public void LoadMemory(byte[] memory)
@@ -190,7 +201,7 @@ namespace JustinCredible.c8emu
             else if (opcode == 0x00E0) // TODO
             {
                 // 00E0	Display	disp_clear()	Clears the screen.
-                // TODO
+                Array.Clear(FrameBuffer, 0, FrameBuffer.Length);
             }
             else if ((opcode & 0xF000) == 0x0000)
             {

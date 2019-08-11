@@ -28,13 +28,12 @@ namespace JustinCredible.c8emu
 
         private static void GUI_OnTick(GUITickEventArgs eventArgs)
         {
-            // TODO: Pass key values through.
-            // TODO: Fetch framebuffer and sound flag.
             _emulator.Step(eventArgs.ElapsedMilliseconds/*, eventArgs.Keys*/);
-            // eventArgs.FrameBuffer = _emulator.FrameBuffer;
-            // eventArgs.PlaySound = _emulator.PlaySound
+            eventArgs.FrameBuffer = _emulator.FrameBuffer;
+            eventArgs.PlaySound = _emulator.PlaySound;
             eventArgs.ShouldQuit = _emulator.Finished;
 
+            /*
             if (eventArgs.FrameBuffer == null)
                 eventArgs.FrameBuffer = new byte[64, 32];
 
@@ -73,6 +72,7 @@ namespace JustinCredible.c8emu
             #endregion
 
             eventArgs.FrameBuffer = frameBuffer;
+            */
         }
     }
 }
