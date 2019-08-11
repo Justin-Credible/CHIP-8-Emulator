@@ -40,15 +40,23 @@ namespace JustinCredible.c8emu
 
         public void StartLoop()
         {
+            // Used to keep track of the time elapsed in each loop iteration. This is used to
+            // notify the OnTick handlers so they can update their simulation, as well as throttle
+            // the update loop to 60hz if needed.
             var stopwatch = new Stopwatch();
+
+            // Structure used to pass data to and from the OnTick handlers. We initialize it once
+            // outside of the loop to avoid eating a ton of memory putting GC into a tailspin.
             var tickEventArgs = new GUITickEventArgs();
+
+            // Indicates the loop should continue to execute.
             var run = true;
+
+            // The SDL event polled for in each iteration of the loop.
             SDL.SDL_Event sdlEvent;
 
             while (run)
             {
-                stopwatch.Restart();
-
                 while (SDL.SDL_PollEvent(out sdlEvent) != 0)
                 {
                     switch (sdlEvent.type)
@@ -74,12 +82,13 @@ namespace JustinCredible.c8emu
 
                 tickEventArgs.PlaySound = false;
 
-                // Send the time elapsed since the last iteration so the simulation can be adjusted.
-                tickEventArgs.ElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-
                 // Send the keys that are currently pressed.
                 // TODO: Set pressed keys.
                 // tickEventArgs.Keys = ???
+
+                // Send the time elapsed since the last iteration so the simulation can be adjusted.
+                tickEventArgs.ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+                stopwatch.Restart();
 
                 // Delegate out to the event handler so work can be done.
                 if (OnTick != null)
@@ -95,12 +104,15 @@ namespace JustinCredible.c8emu
 
                 var frameBuffer = tickEventArgs.FrameBuffer;
 
-                for (var x = 0; x < frameBuffer.GetLength(0); x++)
+                if (frameBuffer != null)
                 {
-                    for (var y = 0; y < frameBuffer.GetLength(1); y++)
+                    for (var x = 0; x < frameBuffer.GetLength(0); x++)
                     {
-                        if (frameBuffer[x, y] == 1)
-                            SDL.SDL_RenderDrawPoint(_renderer, x, y);
+                        for (var y = 0; y < frameBuffer.GetLength(1); y++)
+                        {
+                            if (frameBuffer[x, y] == 1)
+                                SDL.SDL_RenderDrawPoint(_renderer, x, y);
+                        }
                     }
                 }
 
@@ -112,13 +124,12 @@ namespace JustinCredible.c8emu
                     // TODO: Beep
                 }
 
-                // Stop the timer and see if we need to delay to keep locked to ~ 60 FPS.
+                // See if we need to delay to keep locked to ~ 60 FPS.
 
-                stopwatch.Stop();
-
-                if (stopwatch.ElapsedMilliseconds < (1000 / 60))
+                if (stopwatch.Elapsed.TotalMilliseconds < (1000 / 60))
                 {
-                    var delay = (1000 / 60) - stopwatch.ElapsedMilliseconds;
+                    var delay = (1000 / 60) - stopwatch.Elapsed.TotalMilliseconds;
+                    Console.WriteLine($"Throttled: {delay}");
                     SDL.SDL_Delay((uint)delay);
                 }
 

@@ -6,7 +6,7 @@ namespace JustinCredible.c8emu
 {
     class Program
     {
-        // private static Emulator _emulator;
+        private static Emulator _emulator;
         private static int pointX = 31;
         private static int pointY = 17;
         private static bool decrementX = false;
@@ -14,9 +14,10 @@ namespace JustinCredible.c8emu
 
         public static void Main(string[] args)
         {
-            // _emulator = new Emulator();
-            // var rom = System.IO.File.ReadAllBytes("../test.rom");
-            // _emulator.LoadRom(rom);
+            // TODO: Get ROM file path via standard File > Open dialog.
+            _emulator = new Emulator();
+            var rom = System.IO.File.ReadAllBytes("../counter.rom");
+            _emulator.LoadRom(rom);
 
             var gui = new GUI();
             gui.Initialize("CHIP-8 Emulator", 640, 320, 10, 10);
@@ -27,10 +28,12 @@ namespace JustinCredible.c8emu
 
         private static void GUI_OnTick(GUITickEventArgs eventArgs)
         {
-            // _emulator.Step(eventArgs.ElapsedMilliseconds, eventArgs.Keys);
+            // TODO: Pass key values through.
+            // TODO: Fetch framebuffer and sound flag.
+            _emulator.Step(eventArgs.ElapsedMilliseconds/*, eventArgs.Keys*/);
             // eventArgs.FrameBuffer = _emulator.FrameBuffer;
             // eventArgs.PlaySound = _emulator.PlaySound
-            // eventArgs.ShouldQuit = _emulator.Finished;
+            eventArgs.ShouldQuit = _emulator.Finished;
 
             if (eventArgs.FrameBuffer == null)
                 eventArgs.FrameBuffer = new byte[64, 32];
