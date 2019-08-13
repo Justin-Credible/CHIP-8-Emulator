@@ -202,7 +202,7 @@ namespace JustinCredible.c8emu
                 // incremented below.
                 _programCounter = returnAddress;
             }
-            else if (opcode == 0x00E0) // TODO
+            else if (opcode == 0x00E0)
             {
                 // 00E0	Display	disp_clear()	Clears the screen.
                 Array.Clear(FrameBuffer, 0, FrameBuffer.Length);
@@ -372,7 +372,6 @@ namespace JustinCredible.c8emu
                 // NOTE: Wikipedia description is wrong. Search for "misconception" on this page: http://mattmik.com/files/chip8/mastering/chip8.html
                 var registerXIndex = (opcode & 0x0F00) >> 8;
                 var registerYIndex = (opcode & 0x00F0) >> 4;
-                // var valueX = _registers[registerXIndex];
                 var valueY = _registers[registerYIndex];
                 _registers[registerXIndex] = (byte)(valueY >> 1);
                 _registers[15] = (byte)(valueY & 0x01);
@@ -455,10 +454,18 @@ namespace JustinCredible.c8emu
                 // We're going to draw a row of pixels up to the given height.
                 for (var row = 0; row < height; row++)
                 {
+                    // Don't try to fill pixels outside of the frame buffer.
+                    if (y + row >= 32)
+                        continue;
+
                     // For each pixel we're drawing, we XOR the pixel from the sprite against the pixel at the coordinates in
                     // the framebuffer.
                     for (var pixelIndex = 0;  pixelIndex < 8; pixelIndex++)
                     {
+                        // Don't try to fill pixels outside of the frame buffer.
+                        if (x + pixelIndex >= 64)
+                            continue;
+
                         // Is the pixel at the coordinate in the frame buffer already set?
                         var isSet = FrameBuffer[x + pixelIndex, y + row] == 1;
 
