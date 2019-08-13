@@ -20,7 +20,10 @@ namespace JustinCredible.c8emu
         // The CHIP-8 could only play a single beep sound. This flag indicates one should be played.
         public bool PlaySound { get; private set; }
 
-        // 4K of memory
+        // 4K of memory; the first 512 bytes are reserved for
+        // 0x000-0x1FF - Chip 8 interpreter (contains font set in emu)
+        // 0x050-0x0A0 - Used for the built in 4x5 pixel font set (0-F)
+        // 0x200-0xFFF - Program ROM and work RAM
         private byte[] _memory;
 
         // Registers V0-VF
@@ -87,10 +90,14 @@ namespace JustinCredible.c8emu
             FrameBuffer = new byte[64, 32];
         }
 
-        public void LoadMemory(byte[] memory)
+        private void LoadMemory(byte[] memory)
         {
-            // TODO: Populate first 512 bytes with font data?
+            // This expects the ROM loaded starting at 0x200.
             _memory = memory;
+
+            // Copy in the built-in font, which is located at 0x050 through 0x0A0.
+            for (var i = 0; i < Font.Bytes.Length; i++)
+                memory[Font.MemoryLocation + i] = Font.Bytes[i];
         }
 
         public void LoadRom(byte[] rom)
@@ -107,14 +114,11 @@ namespace JustinCredible.c8emu
             var memory = new byte[4096];
 
             // We skip the first 512 bytes which is where the CHIP-8 interpreter is stored on real hardware.
-            var memoryIndex = 512;
+            var romStartIndex = 0x200;
 
             // Copy the bytes over.
             for (var i = 0; i < rom.Length; i++)
-            {
-                memory[memoryIndex] = rom[i];
-                memoryIndex++;
-            }
+                memory[romStartIndex + i] = rom[i];
 
             LoadMemory(memory);
         }
@@ -440,7 +444,42 @@ namespace JustinCredible.c8emu
                 // of N pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value doesn’t change
                 // after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped
                 // from set to unset when the sprite is drawn, and to 0 if that doesn’t happen
-                // TODO
+                // TODO: TEST
+                var registerXIndex = (opcode & 0x0F00) >> 8;
+                var registerYIndex = (opcode & 0x00F0) >> 4;
+                var x = _registers[registerXIndex];
+                var y = _registers[registerYIndex];
+                var height = opcode & 0x000F;
+                var sprite = _memory[_indexRegister];
+
+                // We're going to draw a row of pixels up to the given height.
+                for (var row = 0; row < height; row++)
+                {
+                    // For each pixel we're drawing, we XOR the pixel from the sprite against the pixel at the coordinates in
+                    // the framebuffer.
+                    for (var pixelIndex = 0;  pixelIndex < 8; pixelIndex++)
+                    {
+                        // Is the pixel at the coordinate in the frame buffer already set?
+                        var isSet = FrameBuffer[x + pixelIndex, y + row] == 1;
+
+                        // Looking at the pixel at the given index in the sprite, is it set?
+                        //  Here we use some clever bitshifting to mask out just the bit we want.
+                        var shouldBeSet = (sprite & (1 << pixelIndex)) != 0;
+
+                        if (isSet && shouldBeSet)
+                        {
+                            // If the pixel is set in the frame buffer as well as the sprite, then we set VF to indicate a
+                            // "collision" (which can be used for collision detection by the program) and then flip the pixel.
+                            _registers[15] = 1;
+                            FrameBuffer[x + pixelIndex, y + row] = 0;
+                        }
+                        else if (!isSet && shouldBeSet)
+                        {
+                            // If the pixel wasn't set in the frame buffer, but it was in the sprite, then set it.
+                            FrameBuffer[x + pixelIndex, y + row] = 1;
+                        }
+                    }
+                }
             }
             else if ((opcode & 0xF0FF) == 0xE09E)
             {
@@ -484,7 +523,14 @@ namespace JustinCredible.c8emu
             else if ((opcode & 0xF0FF) == 0xF029)
             {
                 // FX29	MEM	I=sprite_addr[Vx]	Sets I to the location of the sprite for the character in VX. Characters 0-F (in hexadecimal) are represented by a 4x5 font.
-                // TODO
+                // TODO: TEST
+                var registerXIndex = (opcode & 0x0F00) >> 8;
+                var valueX = _registers[registerXIndex];
+
+                // The built in font is the chars 0-9, A-F. Each is 4x5 pixels.
+                // They're stored sequentially. Here we lookup each character
+                // by multiplying by 5 (since there are 5 bytes/rows for each).
+                _indexRegister = (byte)(Font.MemoryLocation + (valueX * 5));
             }
             else if ((opcode & 0xF0FF) == 0xF033)
             {

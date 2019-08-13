@@ -129,7 +129,6 @@ namespace JustinCredible.c8emu
                 if (stopwatch.Elapsed.TotalMilliseconds < (1000 / 60))
                 {
                     var delay = (1000 / 60) - stopwatch.Elapsed.TotalMilliseconds;
-                    Console.WriteLine($"Throttled: {delay}");
                     SDL.SDL_Delay((uint)delay);
                 }
 
