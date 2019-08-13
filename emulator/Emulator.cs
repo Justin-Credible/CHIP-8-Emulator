@@ -17,6 +17,9 @@ namespace JustinCredible.c8emu
         // A zero indicates an empty pixel and one indicates a filled in pixel.
         public byte[,] FrameBuffer { get; private set; }
 
+        // Indicates the frame buffer has been updated since the last call to Step().
+        public bool FrameBufferUpdated { get; private set; }
+
         // The CHIP-8 could only play a single beep sound. This flag indicates one should be played.
         public bool PlaySound { get; private set; }
 
@@ -88,6 +91,7 @@ namespace JustinCredible.c8emu
 
             // Reset the frame buffer (clear the screen).
             FrameBuffer = new byte[64, 32];
+            FrameBufferUpdated = true;
         }
 
         private void LoadMemory(byte[] memory)
@@ -128,6 +132,8 @@ namespace JustinCredible.c8emu
             // Sanity check.
             if (Finished)
                 throw new Exception("Program has finished execution; Reset() must be invoked before invoking Step() again.");
+
+            FrameBufferUpdated = false;
 
             // Indicates if we should increment the program counter by the standard 2 bytes
             // after each fetch/decode/execute cycle. Some opcodes (jump etc) may modify the
@@ -206,6 +212,7 @@ namespace JustinCredible.c8emu
             {
                 // 00E0	Display	disp_clear()	Clears the screen.
                 Array.Clear(FrameBuffer, 0, FrameBuffer.Length);
+                FrameBufferUpdated = true;
             }
             else if ((opcode & 0xF000) == 0x0000)
             {
@@ -479,11 +486,13 @@ namespace JustinCredible.c8emu
                             // "collision" (which can be used for collision detection by the program) and then flip the pixel.
                             _registers[15] = 1;
                             FrameBuffer[x + pixelIndex, y + row] = 0;
+                            FrameBufferUpdated = true;
                         }
                         else if (!isSet && shouldBeSet)
                         {
                             // If the pixel wasn't set in the frame buffer, but it was in the sprite, then set it.
                             FrameBuffer[x + pixelIndex, y + row] = 1;
+                            FrameBufferUpdated = true;
                         }
                     }
                 }

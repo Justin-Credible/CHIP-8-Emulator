@@ -12,6 +12,7 @@ namespace JustinCredible.c8emu
 
         // In
         public byte[,] FrameBuffer { get; set; }
+        public bool ShouldRender { get; set; }
         public bool PlaySound { get; set; }
         public bool ShouldQuit { get; set; }
     }

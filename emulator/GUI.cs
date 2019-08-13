@@ -30,7 +30,7 @@ namespace JustinCredible.c8emu
             if (_window == IntPtr.Zero)
                 throw new Exception(String.Format("Unable to create a window. SDL Error: {0}", SDL.SDL_GetError()));
 
-            _renderer = SDL.SDL_CreateRenderer(_window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED | SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
+            _renderer = SDL.SDL_CreateRenderer(_window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED /*| SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC*/);
 
             if (_renderer == IntPtr.Zero)
                 throw new Exception(String.Format("Unable to create a renderer. SDL Error: {0}", SDL.SDL_GetError()));
@@ -94,29 +94,36 @@ namespace JustinCredible.c8emu
                 if (OnTick != null)
                     OnTick(tickEventArgs);
 
-                // Clear the screen.
-                SDL.SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 0);
-                SDL.SDL_RenderClear(_renderer);
-
-                // Render screen from the updated the frame buffer.
-
-                SDL.SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
-
-                var frameBuffer = tickEventArgs.FrameBuffer;
-
-                if (frameBuffer != null)
+                // We only want to re-render if the frame buffer has changed since last time because
+                // the SDL_RenderPresent method is relatively expensive and massively slows down the
+                // amount of opcodes (ticks) we can execute.
+                if (tickEventArgs.ShouldRender)
                 {
-                    for (var x = 0; x < frameBuffer.GetLength(0); x++)
+                    // Clear the screen.
+                    SDL.SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 0);
+                    SDL.SDL_RenderClear(_renderer);
+
+                    // Render screen from the updated the frame buffer.
+
+                    SDL.SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+
+                    var frameBuffer = tickEventArgs.FrameBuffer;
+
+                    // TODO: Build out a 2D array of points so we can do a single call to SDL_RenderDrawPoints here.
+                    if (frameBuffer != null)
                     {
-                        for (var y = 0; y < frameBuffer.GetLength(1); y++)
+                        for (var x = 0; x < frameBuffer.GetLength(0); x++)
                         {
-                            if (frameBuffer[x, y] == 1)
-                                SDL.SDL_RenderDrawPoint(_renderer, x, y);
+                            for (var y = 0; y < frameBuffer.GetLength(1); y++)
+                            {
+                                if (frameBuffer[x, y] == 1)
+                                    SDL.SDL_RenderDrawPoint(_renderer, x, y);
+                            }
                         }
                     }
-                }
 
-                SDL.SDL_RenderPresent(_renderer);
+                    SDL.SDL_RenderPresent(_renderer);
+                }
 
                 // If the event handler indicated a should needs to be played, do it now.
                 if (tickEventArgs.PlaySound)
@@ -128,8 +135,8 @@ namespace JustinCredible.c8emu
 
                 if (stopwatch.Elapsed.TotalMilliseconds < (1000 / 60))
                 {
-                    var delay = (1000 / 60) - stopwatch.Elapsed.TotalMilliseconds;
-                    SDL.SDL_Delay((uint)delay);
+                    // var delay = (1000 / 60) - stopwatch.Elapsed.TotalMilliseconds;
+                    // SDL.SDL_Delay((uint)delay);
                 }
 
                 // If the event handler indicated we should quit, then stop.

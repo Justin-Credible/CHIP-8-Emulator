@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace JustinCredible.c8emu
@@ -6,6 +7,8 @@ namespace JustinCredible.c8emu
     class Program
     {
         private static Emulator _emulator;
+        private static Stopwatch _performanceWatch = new Stopwatch();
+        private static int _tickCounter = 0;
 
         public static void Main(string[] args)
         {
@@ -24,6 +27,8 @@ namespace JustinCredible.c8emu
             _emulator = new Emulator();
             _emulator.LoadRom(rom);
 
+            _performanceWatch.Start();
+
             var gui = new GUI();
             gui.Initialize("CHIP-8 Emulator", 640, 320, 10, 10);
             gui.OnTick += GUI_OnTick;
@@ -35,8 +40,18 @@ namespace JustinCredible.c8emu
         {
             _emulator.Step(eventArgs.ElapsedMilliseconds/*, eventArgs.Keys*/);
             eventArgs.FrameBuffer = _emulator.FrameBuffer;
+            eventArgs.ShouldRender = _emulator.FrameBufferUpdated;
             eventArgs.PlaySound = _emulator.PlaySound;
             eventArgs.ShouldQuit = _emulator.Finished;
+
+            _tickCounter++;
+
+            if (_performanceWatch.ElapsedMilliseconds >= 1000)
+            {
+                Console.WriteLine("Ticks per second: " + _tickCounter);
+                _tickCounter = 0;
+                _performanceWatch.Restart();
+            }
         }
     }
 }
