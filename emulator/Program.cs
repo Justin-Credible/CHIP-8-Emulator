@@ -1,14 +1,16 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 
 namespace JustinCredible.c8emu
 {
     class Program
     {
         private static Emulator _emulator;
-        private static Stopwatch _performanceWatch = new Stopwatch();
-        private static int _tickCounter = 0;
+        private static bool _guiClosed = false;
+        private static Stopwatch _guiPerformanceWatch;
+        private static int _guiTickCounter;
 
         public static void Main(string[] args)
         {
@@ -27,30 +29,88 @@ namespace JustinCredible.c8emu
             _emulator = new Emulator();
             _emulator.LoadRom(rom);
 
-            _performanceWatch.Start();
-
             var gui = new GUI();
             gui.Initialize("CHIP-8 Emulator", 640, 320, 10, 10);
             gui.OnTick += GUI_OnTick;
+
+            _guiTickCounter = 0;
+            _guiPerformanceWatch = new Stopwatch();
+            _guiPerformanceWatch.Start();
+
+            var emulatorThread = new Thread(new ThreadStart(EmulatorLoop));
+            emulatorThread.Start();
+
             gui.StartLoop();
             gui.Dispose();
+            _guiClosed = true;
+        }
+
+        private static byte[,] _frameBuffer;
+        private static bool _renderFrameNextTick = false;
+        private static bool _playSoundNextTick = false;
+
+        private static void EmulatorLoop()
+        {
+            var tickCounter = 0;
+            var performanceWatch = new Stopwatch();
+            performanceWatch.Start();
+
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            while (!_emulator.Finished && !_guiClosed)
+            {
+                var elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+                stopwatch.Restart();
+
+                // TODO: Pass in pressed keys.
+                _emulator.Step(elapsedMilliseconds /*, _pressedKeys */);
+
+                if (_emulator.FrameBufferUpdated)
+                {
+                    _frameBuffer = _emulator.FrameBuffer;
+                    _renderFrameNextTick = true;
+                }
+
+                if (_emulator.PlaySound)
+                    _playSoundNextTick = true;
+
+                tickCounter++;
+
+                if (performanceWatch.ElapsedMilliseconds >= 1000)
+                {
+                    Console.WriteLine("Opcodes per second: " + tickCounter);
+                    tickCounter = 0;
+                    performanceWatch.Restart();
+                }
+            }
         }
 
         private static void GUI_OnTick(GUITickEventArgs eventArgs)
         {
-            _emulator.Step(eventArgs.ElapsedMilliseconds/*, eventArgs.Keys*/);
-            eventArgs.FrameBuffer = _emulator.FrameBuffer;
-            eventArgs.ShouldRender = _emulator.FrameBufferUpdated;
-            eventArgs.PlaySound = _emulator.PlaySound;
-            eventArgs.ShouldQuit = _emulator.Finished;
+            // TODO: Save off pressed keys.
 
-            _tickCounter++;
-
-            if (_performanceWatch.ElapsedMilliseconds >= 1000)
+            if (_renderFrameNextTick)
             {
-                Console.WriteLine("Ticks per second: " + _tickCounter);
-                _tickCounter = 0;
-                _performanceWatch.Restart();
+                Console.WriteLine("RENDER FRAME!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                eventArgs.FrameBuffer = _frameBuffer;
+                eventArgs.ShouldRender = true;
+                _renderFrameNextTick = false;
+            }
+
+            if (_playSoundNextTick)
+            {
+                eventArgs.PlaySound = true;
+                _playSoundNextTick = false;
+            }
+
+            _guiTickCounter++;
+
+            if (_guiPerformanceWatch.ElapsedMilliseconds >= 1000)
+            {
+                Console.WriteLine("GUI ticks per second: " + _guiTickCounter);
+                _guiTickCounter = 0;
+                _guiPerformanceWatch.Restart();
             }
         }
     }

@@ -57,6 +57,8 @@ namespace JustinCredible.c8emu
 
             while (run)
             {
+                stopwatch.Restart();
+
                 while (SDL.SDL_PollEvent(out sdlEvent) != 0)
                 {
                     switch (sdlEvent.type)
@@ -80,15 +82,12 @@ namespace JustinCredible.c8emu
 
                 // Update the event arguments that will be sent with the event handler.
 
+                tickEventArgs.ShouldRender = false;
                 tickEventArgs.PlaySound = false;
 
                 // Send the keys that are currently pressed.
                 // TODO: Set pressed keys.
                 // tickEventArgs.Keys = ???
-
-                // Send the time elapsed since the last iteration so the simulation can be adjusted.
-                tickEventArgs.ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
-                stopwatch.Restart();
 
                 // Delegate out to the event handler so work can be done.
                 if (OnTick != null)
@@ -133,10 +132,12 @@ namespace JustinCredible.c8emu
 
                 // See if we need to delay to keep locked to ~ 60 FPS.
 
-                if (stopwatch.Elapsed.TotalMilliseconds < (1000 / 60))
+                // if (stopwatch.Elapsed.TotalMilliseconds < (1000 / 60))
+                if (stopwatch.Elapsed.TotalMilliseconds < (1000 / 30))
                 {
                     // var delay = (1000 / 60) - stopwatch.Elapsed.TotalMilliseconds;
-                    // SDL.SDL_Delay((uint)delay);
+                    var delay = (1000 / 30) - stopwatch.Elapsed.TotalMilliseconds;
+                    SDL.SDL_Delay((uint)delay);
                 }
 
                 // If the event handler indicated we should quit, then stop.

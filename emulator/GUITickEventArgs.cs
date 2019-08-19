@@ -7,7 +7,6 @@ namespace JustinCredible.c8emu
     class GUITickEventArgs : EventArgs
     {
         // Out
-        public double ElapsedMilliseconds { get; set; }
         // public ??? Keys { get; set; } // TODO
 
         // In

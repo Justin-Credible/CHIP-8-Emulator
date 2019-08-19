@@ -658,7 +658,7 @@ namespace JustinCredible.c8emu
             if (decrementBy == 0)
                 return;
 
-            // Updaate the delay timer value.
+            // Update the delay timer value.
             if (decrementBy >= _delayTimer)
             {
                 // If we're decrementing by the same or more than the counter, just set to zero.
