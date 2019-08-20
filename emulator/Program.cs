@@ -51,12 +51,15 @@ namespace JustinCredible.c8emu
 
         private static void EmulatorLoop()
         {
-            var tickCounter = 0;
+            var stepCounter = 0;
             var performanceWatch = new Stopwatch();
             performanceWatch.Start();
 
             var stopwatch = new Stopwatch();
             stopwatch.Start();
+
+            // TODO: Make step delay configurable so it can be set per ROM.
+            var stepDelay = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 1000);
 
             while (!_emulator.Finished && !_guiClosed)
             {
@@ -75,14 +78,16 @@ namespace JustinCredible.c8emu
                 if (_emulator.PlaySound)
                     _playSoundNextTick = true;
 
-                tickCounter++;
+                stepCounter++;
 
                 if (performanceWatch.ElapsedMilliseconds >= 1000)
                 {
-                    Console.WriteLine("Opcodes per second: " + tickCounter);
-                    tickCounter = 0;
+                    Console.WriteLine("Opcodes per second: " + stepCounter);
+                    stepCounter = 0;
                     performanceWatch.Restart();
                 }
+
+                Thread.Sleep(stepDelay);
             }
         }
 
@@ -92,7 +97,6 @@ namespace JustinCredible.c8emu
 
             if (_renderFrameNextTick)
             {
-                Console.WriteLine("RENDER FRAME!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 eventArgs.FrameBuffer = _frameBuffer;
                 eventArgs.ShouldRender = true;
                 _renderFrameNextTick = false;
