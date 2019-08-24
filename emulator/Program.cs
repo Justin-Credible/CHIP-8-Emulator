@@ -17,6 +17,7 @@ namespace JustinCredible.c8emu
         private static bool _keepOpenWhenDoneEmulating = false;
 
         private static Emulator _emulator;
+        private static bool _shouldBreak = false;
         private static bool _shouldStep = false;
 
         private static bool _guiClosed = false;
@@ -65,7 +66,8 @@ namespace JustinCredible.c8emu
             var romPathArg = command.Argument("[ROM path]", "The path to a ROM file to load.");
 
             var speedOption = command.Option("-s|--speed", "Controls how fast the emulator should run (10 = regular speed, 1 = slowest speed)", CommandOptionType.SingleValue);
-            var debugOption = command.Option("-d|--debug", "Run in debug mode; dumps registers to console and requires pressing F10 to step the emulator.", CommandOptionType.NoValue);
+            var debugOption = command.Option("-d|--debug", "Run in debug mode; Space Bar = Break, F10 = Step, F5 = Continue", CommandOptionType.NoValue);
+            var breakOption = command.Option("-b|--break", "Breakpoint on startup; requires debug option to function.", CommandOptionType.NoValue);
             var performanceOption = command.Option("-p|--perfmon", "Performance monitor; write stats to the console while running.", CommandOptionType.NoValue);
             var keepOpenOption = command.Option("-ko|--keep-open", "Keep the GUI open even if the emulator finishes ROM execution.", CommandOptionType.NoValue);
 
@@ -89,7 +91,12 @@ namespace JustinCredible.c8emu
                 }
 
                 if (debugOption.HasValue())
+                {
                     _debug = true;
+
+                    if (breakOption.HasValue())
+                        _shouldBreak = true;
+                }
 
                 if (performanceOption.HasValue())
                     _logPerformance = true;
@@ -147,11 +154,11 @@ namespace JustinCredible.c8emu
 
                 // If we're running in debug mode, dump the PC, registers, etc and
                 // then wait until the step key is pressed before continuing.
-                if (_debug)
+                if (_debug && _shouldBreak)
                 {
                     _emulator.PrintDebugSummary();
 
-                    while (!_shouldStep)
+                    while (_shouldBreak)
                     {
                         if (_guiClosed)
                             return;
@@ -159,7 +166,8 @@ namespace JustinCredible.c8emu
                         Thread.Sleep(250);
                     }
 
-                    _shouldStep = false;
+                    if (_shouldStep)
+                        _shouldBreak = true;
                 }
 
                 stopwatch.Restart();
@@ -196,9 +204,6 @@ namespace JustinCredible.c8emu
         {
             // TODO: Save off pressed keys.
 
-            if (_debug && eventArgs.keyDown != null && eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_F10)
-                _shouldStep = true;
-
             if (_renderFrameNextTick)
             {
                 eventArgs.FrameBuffer = _frameBuffer;
@@ -224,6 +229,24 @@ namespace JustinCredible.c8emu
                     Console.WriteLine("GUI ticks per second: " + _guiTickCounter);
                     _guiTickCounter = 0;
                     _guiPerformanceWatch.Restart();
+                }
+            }
+
+            if (_debug && eventArgs.keyDown != null)
+            {
+                if (eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_SPACE)
+                {
+                    _shouldBreak = true;
+                }
+                if (eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_F5)
+                {
+                    _shouldStep = false;
+                    _shouldBreak = false;
+                }
+                else if (eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_F10)
+                {
+                    _shouldStep = true;
+                    _shouldBreak = false;
                 }
             }
         }
