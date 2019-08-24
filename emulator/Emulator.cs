@@ -384,9 +384,14 @@ namespace JustinCredible.c8emu
                 var registerYIndex = (opcode & 0x00F0) >> 4;
                 var valueX = _registers[registerXIndex];
                 var valueY = _registers[registerYIndex];
+
                 var result = valueX + valueY;
-                var carryOccurred = (result & 0x0100) == 0x0100;
+                var carryOccurred = result > 255;
                 _registers[15] = (byte)(carryOccurred ? 0x01 : 0x00);
+
+                if (carryOccurred)
+                    result = result - 256;
+
                 _registers[registerXIndex] = (byte)(result & 0x00FF);
             }
             else if ((opcode & 0xF00F) == 0x8005)
@@ -496,6 +501,7 @@ namespace JustinCredible.c8emu
                 var height = opcode & 0x000F;
 
                 var indexOffset = 0;
+                var collision = false;
 
                 // We're going to draw a row of pixels up to the given height.
                 for (var row = 0; row < height; row++)
@@ -505,8 +511,8 @@ namespace JustinCredible.c8emu
                     // Don't try to fill pixels outside of the frame buffer.
                     if (y + row >= 32)
                     {
-                        var pc = String.Format("0x{0:X4}", _programCounter);
-                        Console.WriteLine($"[WARNING] Attempt to write outside of the framebuffer on the y-axis! PC: {pc}");
+                        // var pc = String.Format("0x{0:X4}", _programCounter);
+                        // Console.WriteLine($"[WARNING] Attempt to write outside of the framebuffer on the y-axis! PC: {pc}");
                         continue;
                     }
 
@@ -517,8 +523,8 @@ namespace JustinCredible.c8emu
                         // Don't try to fill pixels outside of the frame buffer.
                         if (x + pixelIndex >= 64)
                         {
-                            var pc = String.Format("0x{0:X4}", _programCounter);
-                            Console.WriteLine($"[WARNING] Attempt to write outside of the framebuffer on the x-axis! PC: {pc}");
+                            // var pc = String.Format("0x{0:X4}", _programCounter);
+                            // Console.WriteLine($"[WARNING] Attempt to write outside of the framebuffer on the x-axis! PC: {pc}");
                             continue;
                         }
 
@@ -533,7 +539,7 @@ namespace JustinCredible.c8emu
                         {
                             // If the pixel is set in the frame buffer as well as the sprite, then we set VF to indicate a
                             // "collision" (which can be used for collision detection by the program) and then flip the pixel.
-                            _registers[15] = 1;
+                            collision = true;
                             FrameBuffer[x + pixelIndex, y + row] = 0;
                             FrameBufferUpdated = true;
                         }
@@ -547,6 +553,8 @@ namespace JustinCredible.c8emu
 
                     indexOffset++;
                 }
+
+                _registers[15] = (byte)(collision ? 1 : 0);
             }
             else if ((opcode & 0xF0FF) == 0xE09E)
             {
