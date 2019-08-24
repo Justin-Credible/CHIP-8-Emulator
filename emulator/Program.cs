@@ -13,6 +13,7 @@ namespace JustinCredible.c8emu
         // Flags set via command line arguments.
         private static bool _debug = false;
         private static bool _logPerformance = false;
+        private static bool _keepOpenWhenDoneEmulating = false;
 
         private static Emulator _emulator;
         private static bool _shouldStep = false;
@@ -64,6 +65,7 @@ namespace JustinCredible.c8emu
 
             var debugOption = command.Option("-d|--debug", "Run in debug mode; dumps registers to console and requires pressing F10 to step the emulator.", CommandOptionType.NoValue);
             var performanceOption = command.Option("-p|--perfmon", "Performance monitor; write stats to the console while running.", CommandOptionType.NoValue);
+            var keepOpenOption = command.Option("-ko|--keep-open", "Keep the GUI open even if the emulator finishes ROM execution.", CommandOptionType.NoValue);
 
             command.OnExecute(() =>
             {
@@ -79,6 +81,9 @@ namespace JustinCredible.c8emu
 
                 if (performanceOption.HasValue())
                     _logPerformance = true;
+
+                if (keepOpenOption.HasValue())
+                    _keepOpenWhenDoneEmulating = true;
 
                 // TODO: Get ROM file path via standard File > Open dialog if one not specified
                 // via the command line arguments.
@@ -194,6 +199,9 @@ namespace JustinCredible.c8emu
                 eventArgs.PlaySound = true;
                 _playSoundNextTick = false;
             }
+
+            if (_emulator.Finished && !_keepOpenWhenDoneEmulating)
+                eventArgs.ShouldQuit = true;
 
             if (_logPerformance)
             {
