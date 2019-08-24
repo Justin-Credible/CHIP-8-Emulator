@@ -127,6 +127,35 @@ namespace JustinCredible.c8emu
             LoadMemory(memory);
         }
 
+        public void PrintDebugSummary()
+        {
+            var opcode = String.Format("0x{0:X4}", Fetch(_programCounter));
+            var pc = String.Format("0x{0:X4}", _programCounter);
+            var i = String.Format("0x{0:X4}", _indexRegister);
+            var v0 = String.Format("0x{0:X2}", _registers[0]);
+            var v1 = String.Format("0x{0:X2}", _registers[1]);
+            var v2 = String.Format("0x{0:X2}", _registers[2]);
+            var v3 = String.Format("0x{0:X2}", _registers[3]);
+            var v4 = String.Format("0x{0:X2}", _registers[4]);
+            var v5 = String.Format("0x{0:X2}", _registers[5]);
+            var v6 = String.Format("0x{0:X2}", _registers[6]);
+            var v7 = String.Format("0x{0:X2}", _registers[7]);
+            var v8 = String.Format("0x{0:X2}", _registers[8]);
+            var v9 = String.Format("0x{0:X2}", _registers[9]);
+            var vA = String.Format("0x{0:X2}", _registers[10]);
+            var vB = String.Format("0x{0:X2}", _registers[11]);
+            var vC = String.Format("0x{0:X2}", _registers[12]);
+            var vD = String.Format("0x{0:X2}", _registers[13]);
+            var vE = String.Format("0x{0:X2}", _registers[14]);
+            var vF = String.Format("0x{0:X2}", _registers[15]);
+
+            Console.WriteLine($"PC: ${pc}\tNext Opcode: ${opcode}\tI: ${i}");
+            Console.WriteLine($"v0: ${v0}\tv1: ${v1}\tv2: ${v2}\tv3: ${v3}\t");
+            Console.WriteLine($"v4: ${v4}\tv5: ${v5}\tv6: ${v6}\tv7: ${v7}\t");
+            Console.WriteLine($"v8: ${v8}\tv9: ${v9}\tvA: ${vA}\tvB: ${vB}\t");
+            Console.WriteLine($"vC: ${vC}\tvD: ${vD}\tvE: ${vE}\tvF: ${vF}\t");
+        }
+
         public void Step(double elapsedMilliseconds)
         {
             // Sanity check.

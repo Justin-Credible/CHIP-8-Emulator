@@ -49,31 +49,31 @@ namespace JustinCredible.c8emu
             // outside of the loop to avoid eating a ton of memory putting GC into a tailspin.
             var tickEventArgs = new GUITickEventArgs();
 
-            // Indicates the loop should continue to execute.
-            var run = true;
-
             // The SDL event polled for in each iteration of the loop.
             SDL.SDL_Event sdlEvent;
 
-            while (run)
+            while (true)
             {
                 stopwatch.Restart();
+
+                tickEventArgs.keyDown = null;
 
                 while (SDL.SDL_PollEvent(out sdlEvent) != 0)
                 {
                     switch (sdlEvent.type)
                     {
                        case SDL.SDL_EventType.SDL_QUIT:
-                           run = false;
-                           break;
+                           return;
                         case SDL.SDL_EventType.SDL_KEYDOWN:
                         {
                             switch (sdlEvent.key.keysym.sym)
                             {
                                 case SDL.SDL_Keycode.SDLK_q:
-                                    run = false;
-                                    break;
+                                    return;
                             }
+
+                            // Send the currently pressed key.
+                            tickEventArgs.keyDown = sdlEvent.key.keysym.sym;
 
                             break;
                         }
@@ -84,10 +84,6 @@ namespace JustinCredible.c8emu
 
                 tickEventArgs.ShouldRender = false;
                 tickEventArgs.PlaySound = false;
-
-                // Send the keys that are currently pressed.
-                // TODO: Set pressed keys.
-                // tickEventArgs.Keys = ???
 
                 // Delegate out to the event handler so work can be done.
                 if (OnTick != null)
@@ -142,10 +138,7 @@ namespace JustinCredible.c8emu
 
                 // If the event handler indicated we should quit, then stop.
                 if (tickEventArgs.ShouldQuit)
-                {
-                    run = false;
-                    break;
-                }
+                    return;
             }
         }
 
