@@ -479,20 +479,26 @@ namespace JustinCredible.c8emu
                 // of N pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value doesn’t change
                 // after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped
                 // from set to unset when the sprite is drawn, and to 0 if that doesn’t happen
-                // TODO: TEST
                 var registerXIndex = (opcode & 0x0F00) >> 8;
                 var registerYIndex = (opcode & 0x00F0) >> 4;
                 var x = _registers[registerXIndex];
                 var y = _registers[registerYIndex];
                 var height = opcode & 0x000F;
-                var sprite = _memory[_indexRegister];
+
+                var indexOffset = 0;
 
                 // We're going to draw a row of pixels up to the given height.
                 for (var row = 0; row < height; row++)
                 {
+                    var sprite = _memory[_indexRegister + indexOffset];
+
                     // Don't try to fill pixels outside of the frame buffer.
                     if (y + row >= 32)
+                    {
+                        var pc = String.Format("0x{0:X4}", _programCounter);
+                        Console.WriteLine($"[WARNING] Attempt to write outside of the framebuffer on the y-axis! PC: {pc}");
                         continue;
+                    }
 
                     // For each pixel we're drawing, we XOR the pixel from the sprite against the pixel at the coordinates in
                     // the framebuffer.
@@ -500,14 +506,18 @@ namespace JustinCredible.c8emu
                     {
                         // Don't try to fill pixels outside of the frame buffer.
                         if (x + pixelIndex >= 64)
+                        {
+                            var pc = String.Format("0x{0:X4}", _programCounter);
+                            Console.WriteLine($"[WARNING] Attempt to write outside of the framebuffer on the x-axis! PC: {pc}");
                             continue;
+                        }
 
                         // Is the pixel at the coordinate in the frame buffer already set?
                         var isSet = FrameBuffer[x + pixelIndex, y + row] == 1;
 
                         // Looking at the pixel at the given index in the sprite, is it set?
-                        //  Here we use some clever bitshifting to mask out just the bit we want.
-                        var shouldBeSet = (sprite & (1 << pixelIndex)) != 0;
+                        // Here we use some clever bitshifting to mask out just the bit we want.
+                        var shouldBeSet = (sprite & (1 << (7 - pixelIndex))) != 0;
 
                         if (isSet && shouldBeSet)
                         {
@@ -524,6 +534,8 @@ namespace JustinCredible.c8emu
                             FrameBufferUpdated = true;
                         }
                     }
+
+                    indexOffset++;
                 }
             }
             else if ((opcode & 0xF0FF) == 0xE09E)
@@ -568,7 +580,6 @@ namespace JustinCredible.c8emu
             else if ((opcode & 0xF0FF) == 0xF029)
             {
                 // FX29	MEM	I=sprite_addr[Vx]	Sets I to the location of the sprite for the character in VX. Characters 0-F (in hexadecimal) are represented by a 4x5 font.
-                // TODO: TEST
                 var registerXIndex = (opcode & 0x0F00) >> 8;
                 var valueX = _registers[registerXIndex];
 
