@@ -11,6 +11,7 @@ namespace JustinCredible.c8emu
         private static CommandLineApplication _app;
 
         // Flags set via command line arguments.
+        private static int _speed = 10;
         private static bool _debug = false;
         private static bool _logPerformance = false;
         private static bool _keepOpenWhenDoneEmulating = false;
@@ -63,6 +64,7 @@ namespace JustinCredible.c8emu
 
             var romPathArg = command.Argument("[ROM path]", "The path to a ROM file to load.");
 
+            var speedOption = command.Option("-s|--speed", "Controls how fast the emulator should run (10 = regular speed, 1 = slowest speed)", CommandOptionType.SingleValue);
             var debugOption = command.Option("-d|--debug", "Run in debug mode; dumps registers to console and requires pressing F10 to step the emulator.", CommandOptionType.NoValue);
             var performanceOption = command.Option("-p|--perfmon", "Performance monitor; write stats to the console while running.", CommandOptionType.NoValue);
             var keepOpenOption = command.Option("-ko|--keep-open", "Keep the GUI open even if the emulator finishes ROM execution.", CommandOptionType.NoValue);
@@ -75,6 +77,16 @@ namespace JustinCredible.c8emu
                     rom = System.IO.File.ReadAllBytes(romPathArg.Value);
                 else
                     throw new Exception($"Could not locate a ROM file at path {romPathArg}");
+
+                _speed = 10;
+
+                if (speedOption.HasValue())
+                {
+                    bool parsed = int.TryParse(speedOption.Value(), out _speed);
+
+                    if (!parsed || _speed < 1 || _speed > 10)
+                        throw new Exception("Speed must be between 1 and 10, inclusive.");
+                }
 
                 if (debugOption.HasValue())
                     _debug = true;
@@ -126,8 +138,8 @@ namespace JustinCredible.c8emu
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            // TODO: Make step delay configurable so it can be set per ROM.
-            var stepDelay = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 1000);
+            // Setup the delay used between each emulator opcode step.
+            var stepDelay = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / (_speed * 10));
 
             while (!_emulator.Finished && !_guiClosed)
             {
