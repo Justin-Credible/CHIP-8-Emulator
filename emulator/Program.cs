@@ -35,6 +35,7 @@ namespace JustinCredible.c8emu
 
             _app = new CommandLineApplication();
             _app.Name = "c8emu";
+            _app.Description = "CHIP-8 Emulator";
             _app.HelpOption("-?|-h|--help");
 
             _app.VersionOption("-v|--version",
@@ -78,7 +79,7 @@ namespace JustinCredible.c8emu
                 if (File.Exists(romPathArg.Value))
                     rom = System.IO.File.ReadAllBytes(romPathArg.Value);
                 else
-                    throw new Exception($"Could not locate a ROM file at path {romPathArg}");
+                    throw new Exception($"Could not locate a ROM file at path {romPathArg.Value}");
 
                 _speed = 10;
 

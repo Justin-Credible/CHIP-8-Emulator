@@ -18,6 +18,19 @@
             }
         },
         {
+            "label": "build c8asm",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/assembler/c8asm.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build",
+        },
+        {
             "label": "publish c8emu",
             "command": "dotnet",
             "type": "process",
@@ -30,13 +43,12 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "watch c8emu",
+            "label": "publish c8asm",
             "command": "dotnet",
             "type": "process",
             "args": [
-                "watch",
-                "run",
-                "${workspaceFolder}/emulator/c8emu.csproj",
+                "publish",
+                "${workspaceFolder}/assembler/c8asm.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
