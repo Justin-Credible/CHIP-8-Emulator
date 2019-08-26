@@ -11,22 +11,29 @@ namespace JustinCredible.c8asm
         private static readonly Regex _labelRegEx = new Regex("([A-Za-z_]):");
         private static readonly Regex _dataHexRegEx = new Regex("DW #([0-9A-F]{4})");
         private static readonly Regex _dataBinaryRegEx = new Regex("DB $([01.]{8})");
+        private static readonly Regex _instructionRegEx = new Regex("^([A-Za-z]+)(?:\\s+([A-Za-z0-9#$]+)(?:,\\s+([A-Za-z0-9#$]+)(?:,\\s+([A-Za-z0-9#$]+))?)?)?$");
+        private static readonly Regex _addressRegEx = new Regex("\\$[0-9A-F]{3}");
+        private static readonly Regex _hexLiteralValueRegEx = new Regex("#[0-9A-F]{2}");
+        private static readonly Regex _decLiteralValueRegEx = new Regex("[0-9]{1,2}");
+        private static readonly Regex _registerRegEx = new Regex("V[0-9A-F]");
 
-        private static readonly List<string> _instructions = new List<string>()
+        // Instructions and how many operands they expect.
+        private static readonly Dictionary<string, int> _instructions = new Dictionary<string, int>()
         {
-            "LD",
-            "DRW",
-            "ADD",
-            "SE",
-            "SNE",
-            "JP",
-            "RND",
-            "SKNP",
-            "AND",
-            "SUB",
-            "XOR",
-            "CALL",
-            "RET",
+            { "ADD", 2 },
+            { "AND", 2 },
+            { "CALL", 1 },
+            { "DRW", 3 },
+            { "JP", 1 },
+            { "SYS", 1 },
+            { "LD", 2 },
+            { "RET", 0 },
+            { "RND", 2 },
+            { "SE", 2 },
+            { "SKNP", 1 },
+            { "SNE", 2 },
+            { "SUB", 2 },
+            { "XOR", 2 },
         };
 
         public static byte[] AssembleSource(string source)
@@ -80,9 +87,6 @@ namespace JustinCredible.c8asm
                 }
             }
 
-            // Reset the pointer in preparation for the second pass.
-            pointer = 0x200;
-
             // Second pass; assemble opcodes from instructions.
             for (var i = 0; i < sourceLines.Length; i++)
             {
@@ -104,12 +108,23 @@ namespace JustinCredible.c8asm
                 else if (IsInstruction(sourceLine))
                 {
                     // Parse the instruction and assemble into an opcode.
-                    var opcode = AssembleInstruction(sourceLine, labels);
+                    UInt16 opcode;
+
+                    try
+                    {
+                        opcode = AssembleInstruction(sourceLine, labels);
+                    }
+                    catch (Exception exception)
+                    {
+                        throw new Exception($"An error occurred while assembling instruction '{sourceLine}' on line {lineNumber}.", exception);
+                    }
 
                     // Write out the opcode and increment the pointer by the size of the opcode.
-                    rom[pointer] = (byte)((opcode & 0xFF00) >> 2);
-                    rom[pointer + 1] = (byte)(opcode & 0x00FF);
-                    pointer += 2;
+                    // rom[pointer] = (byte)((opcode & 0xFF00) >> 2);
+                    // rom[pointer + 1] = (byte)(opcode & 0x00FF);
+                    // pointer += 2;
+                    rom.Add((byte)((opcode & 0xFF00) >> 2));
+                    rom.Add((byte)(opcode & 0x00FF));
 
                     continue;
                 }
@@ -131,8 +146,9 @@ namespace JustinCredible.c8asm
                     // Write out each of the bytes, incrementing the poitner once for each byte.
                     foreach (byte singleByte in bytes)
                     {
-                        rom[pointer] = singleByte;
-                        pointer += 1;
+                        // rom[pointer] = singleByte;
+                        // pointer += 1;
+                        rom.Add(singleByte);
                     }
 
                     continue;
@@ -168,7 +184,7 @@ namespace JustinCredible.c8asm
         {
             foreach (var instruction in _instructions)
             {
-                if (sourceLine.StartsWith(instruction + " "))
+                if (sourceLine.StartsWith(instruction.Key))
                     return true;
             }
 
@@ -180,10 +196,83 @@ namespace JustinCredible.c8asm
             return _dataHexRegEx.IsMatch(sourceLine) || _dataBinaryRegEx.IsMatch(sourceLine);
         }
 
-        private static UInt16 AssembleInstruction(string sourceLine, Dictionary<string, UInt16> labels)
+        public static UInt16 AssembleInstruction(string sourceLine, Dictionary<string, UInt16> labels)
         {
-            // TODO
-            throw new NotImplementedException();
+            if (labels == null)
+                labels = new Dictionary<string, UInt16>();
+
+            var match = _instructionRegEx.Match(sourceLine);
+
+            if (!match.Success || match.Captures.Count == 0)
+                throw new Exception("Error parsing instruction.");
+
+            var instruction = match.Groups[0].Value.ToUpper();
+            string operand1 = null;
+            string operand2 = null;;
+            string operand3 = null;;
+
+            if (!_instructions.ContainsKey(instruction))
+                throw new Exception("Unknown instruction encountered.");
+
+            var expectedOperandCount = _instructions[instruction];
+
+            if (match.Captures.Count != expectedOperandCount + 1)
+                throw new Exception($"Expected {expectedOperandCount} operands, but {match.Captures.Count} were present.");
+
+            if (expectedOperandCount >= 1)
+                operand1 = match.Captures[1].Value;
+
+            if (expectedOperandCount >= 2)
+                operand2 = match.Captures[2].Value;
+
+            if (expectedOperandCount == 3)
+                operand3 = match.Captures[3].Value;
+
+            if (expectedOperandCount > 3)
+                throw new Exception($"Only 3 operands are supported, but encountered {expectedOperandCount}.");
+
+            switch (instruction)
+            {
+                // 00EE	Flow	return;	Returns from a subroutine.
+                case "RET":
+                    return 0x00EE;
+
+                // 00E0	Display	disp_clear()	Clears the screen.
+                case "CLS":
+                    return 0x00E0;
+
+                // 0NNN	Call		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
+                case "SYS":
+                {
+                    var address = ParseAddress(operand1, labels);
+                    return (UInt16)(0x0000 | address);
+                }
+
+                // 1NNN	Flow	goto NNN;	Jumps to address NNN.
+                case "JP":
+                {
+                    var address = ParseAddress(operand1, labels);
+                    return (UInt16)(0x1000 | address);
+                }
+
+                // 2NNN	Flow	*(0xNNN)()	Calls subroutine at NNN.
+                case "CALL":
+                {
+                    var address = ParseAddress(operand1, labels);
+                    return (UInt16)(0x2000 | address);
+                }
+
+                // 3XNN	Cond	if(Vx==NN)	Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block)
+                case "SE":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    var value = ParseLiteralValue(operand2);
+                    return (UInt16)(0x3000 | (vIndex << 8) | value);
+                }
+
+                default:
+                    throw new NotImplementedException($"No implementation defined for the {instruction} instruction.");
+            }
         }
 
         private static void AssembleData(string sourceLine, out byte[] bytes)
@@ -210,6 +299,49 @@ namespace JustinCredible.c8asm
             }
             else
                 throw new Exception("Unknown data type encountered.");
+        }
+
+        private static UInt16 ParseAddress(string operand, Dictionary<string, UInt16> labels)
+        {
+            // Addresses normally start with $ and if they don't, assume it's a label.
+            if (!operand.StartsWith("$"))
+            {
+                // Lookup the label in the dictionary.
+                if (!labels.ContainsKey(operand))
+                    throw new Exception($"Could not locate a label with name '{operand}'.");
+
+                operand = "$" + String.Format("{0:X3}", labels[operand]);
+            }
+
+            // Ensure we have a valid hex address.
+            if (!_addressRegEx.IsMatch(operand))
+                throw new Exception($"Expected an address with format $XXX, but encountered '{operand}'.");
+
+            return Convert.ToByte(operand.Substring(1), 16);
+        }
+
+        private static byte ParseRegisterIndex(string operand)
+        {
+            if (!_registerRegEx.IsMatch(operand))
+                throw new Exception($"Unable to parse register index from value '{operand}'.");
+
+            return Convert.ToByte(operand.Substring(1), 16);
+        }
+
+        private static byte ParseLiteralValue(string operand)
+        {
+            if (_hexLiteralValueRegEx.IsMatch(operand))
+            {
+                // Hexidecimal
+                return Convert.ToByte(operand.Substring(1), 16);
+            }
+            else if (_decLiteralValueRegEx.IsMatch(operand))
+            {
+                // Decimal
+                return Convert.ToByte(operand, 10);
+            }
+            else
+                throw new Exception($"Unable to parse literal value '{operand}'.");
         }
     }
 }

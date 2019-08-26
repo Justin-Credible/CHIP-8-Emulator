@@ -66,7 +66,7 @@ namespace JustinCredible.c8asm
                 {
                     var targetDirPath = Path.GetDirectoryName(sourcePathArg.Value);
                     var fileName = Path.GetFileNameWithoutExtension(sourcePathArg.Value);
-                    romPath = Path.Combine(targetDirPath, fileName, ".ROM");
+                    romPath = Path.Combine(targetDirPath, fileName + ".ROM");
                 }
 
                 var rom = Assembler.AssembleSource(source);
