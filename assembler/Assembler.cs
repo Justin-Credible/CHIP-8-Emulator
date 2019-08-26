@@ -6,16 +6,17 @@ using Microsoft.Extensions.CommandLineUtils;
 
 namespace JustinCredible.c8asm
 {
-    class Assembler
+    public class Assembler
     {
         private static readonly Regex _labelRegEx = new Regex("([A-Za-z_]):");
         private static readonly Regex _dataHexRegEx = new Regex("DW #([0-9A-F]{4})");
         private static readonly Regex _dataBinaryRegEx = new Regex("DB $([01.]{8})");
-        private static readonly Regex _instructionRegEx = new Regex("^([A-Za-z]+)(?:\\s+([A-Za-z0-9#$]+)(?:,\\s+([A-Za-z0-9#$]+)(?:,\\s+([A-Za-z0-9#$]+))?)?)?$");
-        private static readonly Regex _addressRegEx = new Regex("\\$[0-9A-F]{3}");
-        private static readonly Regex _hexLiteralValueRegEx = new Regex("#[0-9A-F]{2}");
-        private static readonly Regex _decLiteralValueRegEx = new Regex("[0-9]{1,2}");
-        private static readonly Regex _registerRegEx = new Regex("V[0-9A-F]");
+
+        private static readonly Regex _instructionRegEx = new Regex("^(?'inst'[A-Za-z]+)(?:\\s+(?'opand1'[A-Za-z0-9#$_]+)(?:,\\s+(?'opand2'[A-Za-z0-9#$_]+)(?:,\\s+(?'opand3'[A-Za-z0-9#$_]+))?)?)?$");
+        private static readonly Regex _addressRegEx = new Regex("^\\$[0-9A-F]{3}$");
+        private static readonly Regex _hexLiteralValueRegEx = new Regex("^#[0-9A-F]{2}$");
+        private static readonly Regex _decLiteralValueRegEx = new Regex("^[0-9]{1,3}$");
+        private static readonly Regex _registerRegEx = new Regex("^V[0-9A-F]$");
 
         // Instructions and how many operands they expect.
         private static readonly Dictionary<string, int> _instructions = new Dictionary<string, int>()
@@ -23,9 +24,9 @@ namespace JustinCredible.c8asm
             { "ADD", 2 },
             { "AND", 2 },
             { "CALL", 1 },
+            { "CLS", 0 },
             { "DRW", 3 },
             { "JP", 1 },
-            { "SYS", 1 },
             { "LD", 2 },
             { "RET", 0 },
             { "RND", 2 },
@@ -33,6 +34,7 @@ namespace JustinCredible.c8asm
             { "SKNP", 1 },
             { "SNE", 2 },
             { "SUB", 2 },
+            { "SYS", 1 },
             { "XOR", 2 },
         };
 
@@ -206,7 +208,7 @@ namespace JustinCredible.c8asm
             if (!match.Success || match.Captures.Count == 0)
                 throw new Exception("Error parsing instruction.");
 
-            var instruction = match.Groups[0].Value.ToUpper();
+            var instruction = match.Groups[1].Value.ToUpper();
             string operand1 = null;
             string operand2 = null;;
             string operand3 = null;;
@@ -214,19 +216,37 @@ namespace JustinCredible.c8asm
             if (!_instructions.ContainsKey(instruction))
                 throw new Exception("Unknown instruction encountered.");
 
+            // Count how many groups we matched.
+
+            var groupsMatched = 0;
+
+            foreach (Group group in match.Groups)
+            {
+                if (group.Success)
+                    groupsMatched++;
+            }
+
+            // Account for the first and second groups, which are the entire string and instruction respectively.
+            groupsMatched--;
+            groupsMatched--;
+
+            // Assert that we've matched the number of operands expected for this instruction.
+
             var expectedOperandCount = _instructions[instruction];
 
-            if (match.Captures.Count != expectedOperandCount + 1)
-                throw new Exception($"Expected {expectedOperandCount} operands, but {match.Captures.Count} were present.");
+            if (groupsMatched != expectedOperandCount)
+                throw new Exception($"Expected {expectedOperandCount} operands, but {groupsMatched} were present.");
+
+            // Grab each of the operand strings.
 
             if (expectedOperandCount >= 1)
-                operand1 = match.Captures[1].Value;
+                operand1 = match.Groups[2].Value;
 
             if (expectedOperandCount >= 2)
-                operand2 = match.Captures[2].Value;
+                operand2 = match.Groups[3].Value;
 
             if (expectedOperandCount == 3)
-                operand3 = match.Captures[3].Value;
+                operand3 = match.Groups[4].Value;
 
             if (expectedOperandCount > 3)
                 throw new Exception($"Only 3 operands are supported, but encountered {expectedOperandCount}.");
@@ -317,7 +337,7 @@ namespace JustinCredible.c8asm
             if (!_addressRegEx.IsMatch(operand))
                 throw new Exception($"Expected an address with format $XXX, but encountered '{operand}'.");
 
-            return Convert.ToByte(operand.Substring(1), 16);
+            return Convert.ToUInt16(operand.Substring(1), 16);
         }
 
         private static byte ParseRegisterIndex(string operand)

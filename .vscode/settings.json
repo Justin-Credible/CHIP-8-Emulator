@@ -7,5 +7,6 @@
         "**/bin": true,
         "**/obj": true
     },
-    "csharp.referencesCodeLens.enabled": false
+    "csharp.referencesCodeLens.enabled": false,
+    "dotnet-test-explorer.testProjectPath": "**/*.tests.csproj"
 }
