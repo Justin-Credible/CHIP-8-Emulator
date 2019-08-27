@@ -337,10 +337,18 @@ namespace JustinCredible.c8emu
             }
             else if ((opcode & 0xF000) == 0x7000)
             {
-                // 7XNN	Const	Vx += NN	Adds NN to VX. (Carry flag is not changed)
+                // 7XNN	Math	Vx += NN	Adds NN to VX. (Carry flag is not changed)
                 var registerIndex = (opcode & 0x0F00) >> 8;
-                var value = _registers[registerIndex];
-                _registers[registerIndex] = (byte)(value + opcode);
+                var valueX = _registers[registerIndex];
+                var value = opcode & 0x00FF;
+
+                var result = valueX + value;
+                var carryOccurred = result > 255;
+
+                if (carryOccurred)
+                    result = result - 256;
+
+                _registers[registerIndex] = (byte)(result & 0x00FF);
             }
             else if ((opcode & 0xF00F) == 0x8000)
             {
