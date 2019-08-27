@@ -19,23 +19,46 @@ namespace JustinCredible.c8asm
         private static readonly Regex _registerRegEx = new Regex("^V[0-9A-F]$");
 
         // Instructions and how many operands they expect.
+        // Using the easier list from here: https://github.com/craigthomas/Chip8Assembler#chip-8-mnemonics
+        // just to get up and running for now. Ultimately this is the list that should be implemented for
+        // the widest compatibility: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
         private static readonly Dictionary<string, int> _instructions = new Dictionary<string, int>()
         {
-            { "ADD", 2 },
-            { "AND", 2 },
-            { "CALL", 1 },
-            { "CLS", 0 },
-            { "DRW", 3 },
-            { "JP", 1 },
-            { "LD", 2 },
-            { "RET", 0 },
-            { "RND", 2 },
-            { "SE", 2 },
-            { "SKNP", 1 },
-            { "SNE", 2 },
-            { "SUB", 2 },
             { "SYS", 1 },
+            { "CLR", 0 },
+            { "RTS", 0 },
+            { "JUMP", 1 },
+            { "CALL", 1 },
+            { "SKE", 2 },
+            { "SKNE", 2 },
+            { "SKRE", 2 },
+            { "LOAD", 2 },
+            { "ADD", 2 },
+            { "COPY", 2 }, // Named MOVE in the spec, but is actually a COPY.
+            { "OR", 2 },
+            { "AND", 2 },
             { "XOR", 2 },
+            { "ADDR", 2 },
+            { "SUB", 2 },
+            { "SHR", 2 },
+            { "SUBN", 2 }, // Missing from the spec.
+            { "SHL", 2 },
+            { "SKRNE", 2 },
+            { "LOADI", 1 },
+            { "JUMPI", 1 },
+            { "RAND", 2 },
+            { "DRAW", 3 },
+            { "SKPR", 1 },
+            { "SKUP", 1 },
+            { "MOVED", 1 },
+            { "KEYD", 1 },
+            { "LOADD", 1 },
+            { "LOADS", 1 },
+            { "ADDI", 1 },
+            { "LDSPR", 1 },
+            { "BCD", 1 },
+            { "STOR", 1 },
+            { "READ", 1 },
         };
 
         public static byte[] AssembleSource(string source)
@@ -254,14 +277,17 @@ namespace JustinCredible.c8asm
             switch (instruction)
             {
                 // 00EE	Flow	return;	Returns from a subroutine.
-                case "RET":
+                // RTS
+                case "RTS":
                     return 0x00EE;
 
                 // 00E0	Display	disp_clear()	Clears the screen.
-                case "CLS":
+                // CLR
+                case "CLR":
                     return 0x00E0;
 
                 // 0NNN	Call		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
+                // SYS $123
                 case "SYS":
                 {
                     var address = ParseAddress(operand1, labels);
@@ -269,13 +295,15 @@ namespace JustinCredible.c8asm
                 }
 
                 // 1NNN	Flow	goto NNN;	Jumps to address NNN.
-                case "JP":
+                // JUMP $123
+                case "JUMP":
                 {
                     var address = ParseAddress(operand1, labels);
                     return (UInt16)(0x1000 | address);
                 }
 
                 // 2NNN	Flow	*(0xNNN)()	Calls subroutine at NNN.
+                // CALL $123
                 case "CALL":
                 {
                     var address = ParseAddress(operand1, labels);
@@ -283,11 +311,131 @@ namespace JustinCredible.c8asm
                 }
 
                 // 3XNN	Cond	if(Vx==NN)	Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block)
-                case "SE":
+                // SE V2, #2A
+                case "SKE":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
                     var value = ParseLiteralValue(operand2);
                     return (UInt16)(0x3000 | (vIndex << 8) | value);
+                }
+
+                // 4XNN	Cond	if(Vx!=NN)	Skips the next instruction if VX doesn't equal NN. (Usually the next instruction is a jump to skip a code block)
+                // SNE V2, #2A
+                case "SKNE":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    var value = ParseLiteralValue(operand2);
+                    return (UInt16)(0x4000 | (vIndex << 8) | value);
+                }
+
+                // 5XY0	Cond	if(Vx==Vy)	Skips the next instruction if VX equals VY. (Usually the next instruction is a jump to skip a code block)
+                // SRE V2, V3
+                case "SKRE":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x5000 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 6XNN	Const	Vx = NN	Sets VX to NN.
+                // LOAD V2, #F2
+                // LOAD V2, 13
+                case "LOAD":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    var value = ParseLiteralValue(operand2);
+                    return (UInt16)(0x6000 | (vIndex << 8) | value);
+                }
+
+                // 7XNN	Math	Vx += NN	Adds NN to VX. (Carry flag is not changed)
+                // ADD V2, #F2
+                // ADD V2, 13
+                case "ADD":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    var value = ParseLiteralValue(operand2);
+                    return (UInt16)(0x7000 | (vIndex << 8) | value);
+                }
+
+                // 8XY0	Assign	Vx=Vy	Sets VX to the value of VY.
+                // COPY V2, VA
+                case "COPY":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8000 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY1	BitOp	Vx=Vx|Vy	Sets VX to VX or VY. (Bitwise OR operation)
+                // OR V2, VA
+                case "OR":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8001 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY2	BitOp	Vx=Vx&Vy	Sets VX to VX and VY. (Bitwise AND operation)
+                // AND V2, VA
+                case "AND":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8002 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY3	BitOp	Vx=Vx^Vy	Sets VX to VX xor VY.
+                // XOR V2, VA
+                case "XOR":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8003 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY4	Math	Vx += Vy	Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+                // ADDR V2, VA
+                case "ADDR":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8004 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY5	Math	Vx -= Vy	VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+                // SUB V2, VA
+                case "SUB":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8005 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY6	BitOp	Vx = Vy >> 1	Store the value of register VY shifted right one bit in register VX. Set register VF to the least significant bit prior to the shift.
+                // SHR V2, VA
+                case "SHR":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8006 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XY7	Math	Vx=Vy-Vx	Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+                // SUBN V2, VA
+                case "SUBN":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x8007 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // 8XYE	BitOp	Vx = Vy << 1    Store the value of register VY shifted left one bit in register VX. Set register VF to the most significant bit prior to the shift.
+                // SHL V2, VA
+                case "SHL":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x800E | (vIndex1 << 8) | vIndex2 << 4);
                 }
 
                 default:
