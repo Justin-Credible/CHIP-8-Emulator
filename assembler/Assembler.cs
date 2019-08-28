@@ -6,7 +6,7 @@ namespace JustinCredible.c8asm
 {
     public class Assembler
     {
-        private static readonly Regex _labelRegEx = new Regex("([A-Za-z_]):");
+        private static readonly Regex _labelRegEx = new Regex("([A-Za-z_]+):");
         private static readonly Regex _dataHexRegEx = new Regex("DW #([0-9A-F]{4})");
         private static readonly Regex _dataBinaryRegEx = new Regex("DB $([01.]{8})");
 
@@ -146,11 +146,8 @@ namespace JustinCredible.c8asm
                         throw new Exception($"An error occurred while assembling instruction '{sourceLine}' on line {lineNumber}.", exception);
                     }
 
-                    // Write out the opcode and increment the pointer by the size of the opcode.
-                    // rom[pointer] = (byte)((opcode & 0xFF00) >> 2);
-                    // rom[pointer + 1] = (byte)(opcode & 0x00FF);
-                    // pointer += 2;
-                    rom.Add((byte)((opcode & 0xFF00) >> 2));
+                    // Split the opcode into two bytes and add to the ROM.
+                    rom.Add((byte)((opcode & 0xFF00) >> 8));
                     rom.Add((byte)(opcode & 0x00FF));
 
                     continue;

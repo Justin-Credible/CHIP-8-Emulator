@@ -2,7 +2,7 @@ using System;
 
 namespace JustinCredible.c8emu
 {
-    class Emulator
+    public class Emulator
     {
         private static readonly UInt16 MIN_STACK = 0xEA0;
         private static readonly UInt16 MAX_STACK = 0xEFF;
@@ -124,6 +124,18 @@ namespace JustinCredible.c8emu
                 memory[romStartIndex + i] = rom[i];
 
             LoadMemory(memory);
+        }
+
+        public EmulatorState DumpState()
+        {
+            return new EmulatorState()
+            {
+                Memory = _memory,
+                Registers = _registers,
+                ProgramCounter = _programCounter,
+                StackPointer = _stackPointer,
+                IndexRegister = _indexRegister,
+            };
         }
 
         public void PrintDebugSummary()
