@@ -1,12 +1,12 @@
 using System;
-using static SDL2.SDL;
+using SDL2;
 
 namespace JustinCredible.c8emu
 {
     class GUITickEventArgs : EventArgs
     {
         // Out
-        public SDL_Keycode? keyDown { get; set; }
+        public SDL.SDL_Keycode? keyDown { get; set; }
 
         // In
         public byte[,] FrameBuffer { get; set; }

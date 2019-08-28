@@ -272,5 +272,193 @@ namespace JustinCredible.c8asm.Tests
             var result = Assembler.AssembleInstruction(instruction, null);
             Assert.Equal(0x8A6E, result);
         }
+
+        [Fact]
+        public void HandlesSKRNE()
+        {
+            var instruction = "SKRNE VA, V6";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0x9A60, result);
+        }
+
+        [Fact]
+        public void HandlesLOADI()
+        {
+            var instruction = "LOADI $A23";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xAA23, result);
+        }
+
+        [Fact]
+        public void HandlesJUMPI()
+        {
+            var instruction = "JUMPI $A23";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xBA23, result);
+        }
+
+        [Fact]
+        public void HandlesRAND_WithHexLiteral()
+        {
+            var instruction = "RAND VA, #6E";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xCA6E, result);
+        }
+
+        [Fact]
+        public void HandlesRAND_WithHexLiteralTooLarge()
+        {
+            var instruction = "RAND VA, #6EF";
+            Assert.Throws<Exception>(() => Assembler.AssembleInstruction(instruction, null));
+        }
+
+        [Fact]
+        public void HandlesRAND_WithDecLiteral()
+        {
+            var instruction = "RAND VA, 167";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xCAA7, result);
+        }
+
+        [Fact]
+        public void HandlesRAND_WithDecLiteralTooLarge()
+        {
+            var instruction = "RAND VA, 270";
+            Assert.Throws<OverflowException>(() => Assembler.AssembleInstruction(instruction, null));
+        }
+
+        [Fact]
+        public void HandlesDRAW_WithHexLiteral()
+        {
+            var instruction = "DRAW VA, V6, #E";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xDA6E, result);
+        }
+
+        [Fact]
+        public void HandlesDRAW_WithHexLiteralTooLarge()
+        {
+            var instruction = "DRAW VA, V6, #6E";
+            Assert.Throws<Exception>(() => Assembler.AssembleInstruction(instruction, null));
+        }
+
+        [Fact]
+        public void HandlesDRAW_WithDecLiteral()
+        {
+            var instruction = "DRAW VA, V6, 12";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xDA6C, result);
+        }
+
+        [Fact]
+        public void HandlesDRAW_WithDecLiteralTooLarge()
+        {
+            var instruction = "DRAW VA, V6, 17";
+            Assert.Throws<OverflowException>(() => Assembler.AssembleInstruction(instruction, null));
+        }
+
+        [Fact]
+        public void HandlesSKPR()
+        {
+            var instruction = "SKPR VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xEA9E, result);
+        }
+
+        [Fact]
+        public void HandlesSKUP()
+        {
+            var instruction = "SKUP VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xEAA1, result);
+        }
+
+        [Fact]
+        public void HandlesCOPYD()
+        {
+            var instruction = "COPYD VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA07, result);
+        }
+
+        [Fact]
+        public void HandlesWKEY()
+        {
+            var instruction = "WKEY VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA0A, result);
+        }
+
+        [Fact]
+        public void HandlesLOADD()
+        {
+            var instruction = "LOADD VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA15, result);
+        }
+
+        [Fact]
+        public void HandlesLOADS()
+        {
+            var instruction = "LOADD VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA15, result);
+        }
+
+        [Fact]
+        public void HandlesADDI()
+        {
+            var instruction = "ADDI VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA1E, result);
+        }
+
+        [Fact]
+        public void HandlesLDSPR()
+        {
+            var instruction = "LDSPR VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA29, result);
+        }
+
+        [Fact]
+        public void HandlesBCD()
+        {
+            var instruction = "BCD VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA33, result);
+        }
+
+        [Fact]
+        public void HandlesSTOR()
+        {
+            var instruction = "STOR VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA55, result);
+        }
+
+        [Fact]
+        public void HandlesREAD()
+        {
+            var instruction = "READ VA";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFA65, result);
+        }
+
+        [Fact]
+        public void HandlesDBRK()
+        {
+            var instruction = "DBRK";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFFFE, result);
+        }
+
+        [Fact]
+        public void HandlesDPRN()
+        {
+            var instruction = "DPRN";
+            var result = Assembler.AssembleInstruction(instruction, null);
+            Assert.Equal(0xFFFF, result);
+        }
     }
 }

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.CommandLineUtils;
 
 namespace JustinCredible.c8asm
 {
@@ -14,8 +12,10 @@ namespace JustinCredible.c8asm
 
         private static readonly Regex _instructionRegEx = new Regex("^(?'inst'[A-Za-z]+)(?:\\s+(?'opand1'[A-Za-z0-9#$_]+)(?:,\\s+(?'opand2'[A-Za-z0-9#$_]+)(?:,\\s+(?'opand3'[A-Za-z0-9#$_]+))?)?)?$");
         private static readonly Regex _addressRegEx = new Regex("^\\$[0-9A-F]{3}$");
-        private static readonly Regex _hexLiteralValueRegEx = new Regex("^#[0-9A-F]{2}$");
-        private static readonly Regex _decLiteralValueRegEx = new Regex("^[0-9]{1,3}$");
+        private static readonly Regex _hexLiteralByteValueRegEx = new Regex("^#[0-9A-F]{2}$");
+        private static readonly Regex _decLiteralByteValueRegEx = new Regex("^[0-9]{1,3}$");
+        private static readonly Regex _hexLiteralNibbleValueRegEx = new Regex("^#[0-9A-F]{1}$");
+        private static readonly Regex _decLiteralNibbleValueRegEx = new Regex("^[0-9]{1,2}$");
         private static readonly Regex _registerRegEx = new Regex("^V[0-9A-F]$");
 
         // Instructions and how many operands they expect.
@@ -34,7 +34,7 @@ namespace JustinCredible.c8asm
             { "SKRE", 2 },
             { "LOAD", 2 },
             { "ADD", 2 },
-            { "COPY", 2 }, // Named MOVE in the spec, but is actually a COPY.
+            { "COPY", 2 }, // Named MOVE in the spec, but is actually a COPY of a register value.
             { "OR", 2 },
             { "AND", 2 },
             { "XOR", 2 },
@@ -50,8 +50,8 @@ namespace JustinCredible.c8asm
             { "DRAW", 3 },
             { "SKPR", 1 },
             { "SKUP", 1 },
-            { "MOVED", 1 },
-            { "KEYD", 1 },
+            { "COPYD", 1 }, // Named MOVED in the spec, but is actually a copy of delay timer.
+            { "WKEY", 1 }, // Named KEYD in the spec.
             { "LOADD", 1 },
             { "LOADS", 1 },
             { "ADDI", 1 },
@@ -59,6 +59,9 @@ namespace JustinCredible.c8asm
             { "BCD", 1 },
             { "STOR", 1 },
             { "READ", 1 },
+
+            { "DBRK", 0 }, // Custom opcode for debugging.
+            { "DPRN", 0 }, // Custom opcode for debugging.
         };
 
         public static byte[] AssembleSource(string source)
@@ -68,8 +71,7 @@ namespace JustinCredible.c8asm
             UInt16 pointer = 0x200;
             var labels = new Dictionary<string, UInt16>();
 
-            // TODO: Detect line ending type and use it to split.
-            var sourceLines = source.Split(Environment.NewLine);
+            var sourceLines = source.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
 
             // First pass; calculate memory addresses for labels. Look at each line to see if
             // it is an instruction or literal data and incremenet the counter. If a label is
@@ -233,8 +235,8 @@ namespace JustinCredible.c8asm
 
             var instruction = match.Groups[1].Value.ToUpper();
             string operand1 = null;
-            string operand2 = null;;
-            string operand3 = null;;
+            string operand2 = null;
+            string operand3 = null;
 
             if (!_instructions.ContainsKey(instruction))
                 throw new Exception("Unknown instruction encountered.");
@@ -315,7 +317,7 @@ namespace JustinCredible.c8asm
                 case "SKE":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
-                    var value = ParseLiteralValue(operand2);
+                    var value = ParseLiteralByteValue(operand2);
                     return (UInt16)(0x3000 | (vIndex << 8) | value);
                 }
 
@@ -324,7 +326,7 @@ namespace JustinCredible.c8asm
                 case "SKNE":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
-                    var value = ParseLiteralValue(operand2);
+                    var value = ParseLiteralByteValue(operand2);
                     return (UInt16)(0x4000 | (vIndex << 8) | value);
                 }
 
@@ -343,7 +345,7 @@ namespace JustinCredible.c8asm
                 case "LOAD":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
-                    var value = ParseLiteralValue(operand2);
+                    var value = ParseLiteralByteValue(operand2);
                     return (UInt16)(0x6000 | (vIndex << 8) | value);
                 }
 
@@ -353,7 +355,7 @@ namespace JustinCredible.c8asm
                 case "ADD":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
-                    var value = ParseLiteralValue(operand2);
+                    var value = ParseLiteralByteValue(operand2);
                     return (UInt16)(0x7000 | (vIndex << 8) | value);
                 }
 
@@ -438,6 +440,153 @@ namespace JustinCredible.c8asm
                     return (UInt16)(0x800E | (vIndex1 << 8) | vIndex2 << 4);
                 }
 
+                // 9XY0	Cond	if(Vx!=Vy)	Skips the next instruction if VX doesn't equal VY. (Usually the next instruction is a jump to skip a code block)
+                // SKRNE V2, VA
+                case "SKRNE":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    return (UInt16)(0x9000 | (vIndex1 << 8) | vIndex2 << 4);
+                }
+
+                // ANNN	MEM	I = NNN	Sets I to the address NNN.
+                // LOADI $123
+                case "LOADI":
+                {
+                    var address = ParseAddress(operand1, labels);
+                    return (UInt16)(0xA000 | address);
+                }
+
+                // BNNN	Flow	PC=V0+NNN	Jumps to the address NNN plus V0.
+                // JUMPI $123
+                case "JUMPI":
+                {
+                    var address = ParseAddress(operand1, labels);
+                    return (UInt16)(0xB000 | address);
+                }
+
+                // CXNN	Rand	Vx=rand()&NN	Sets VX to the result of a bitwise and operation on a random number (Typically: 0 to 255) and NN.
+                // RAND V2, 255
+                // RAND V2, #FF
+                case "RAND":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    var value = ParseLiteralByteValue(operand2);
+                    return (UInt16)(0xC000 | (vIndex << 8) | value);
+                }
+
+                // DXYN	Disp	draw(Vx,Vy,N)   x, y, height
+                // DRAW V2, VA, 4
+                case "DRAW":
+                {
+                    var vIndex1 = ParseRegisterIndex(operand1);
+                    var vIndex2 = ParseRegisterIndex(operand2);
+                    var value = ParseLiteralNibbleValue(operand3);
+                    return (UInt16)(0xD000 | (vIndex1 << 8) | vIndex2 << 4 | value);
+                }
+
+                // EX9E	KeyOp	if(key()==Vx)	Skips the next instruction if the key stored in VX is pressed. (Usually the next instruction is a jump to skip a code block)
+                // SKPR V2
+                case "SKPR":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xE09E | (vIndex << 8));
+                }
+
+                // EXA1	KeyOp	if(key()!=Vx)	Skips the next instruction if the key stored in VX isn't pressed. (Usually the next instruction is a jump to skip a code block)
+                // SKUP V2
+                case "SKUP":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xE0A1 | (vIndex << 8));
+                }
+
+                // FX07	Timer	Vx = get_delay()	Sets VX to the value of the delay timer.
+                // COPYD V2
+                case "COPYD":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF007 | (vIndex << 8));
+                }
+
+                // FX0A	KeyOp	Vx = get_key()	A key press is awaited, and then stored in VX. (Blocking Operation. All instruction halted until next key event)
+                // WKEY V2
+                case "WKEY":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF00A | (vIndex << 8));
+                }
+
+                // FX15	Timer	delay_timer(Vx)	Sets the delay timer to VX.
+                // LOADD V2
+                case "LOADD":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF015 | (vIndex << 8));
+                }
+
+                // FX18	Sound	sound_timer(Vx)	Sets the sound timer to VX.
+                // LOADS V2
+                case "LOADS":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF018 | (vIndex << 8));
+                }
+
+                // FX1E	MEM	I +=Vx	Adds VX to I.
+                // ADDI V2
+                case "ADDI":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF01E | (vIndex << 8));
+                }
+
+                // FX29	MEM	I=sprite_addr[Vx]	Sets I to the location of the sprite for the character in VX. Characters 0-F (in hexadecimal) are represented by a 4x5 font.
+                // LDSPR V2
+                case "LDSPR":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF029 | (vIndex << 8));
+                }
+
+                // FX33	BCD	set_BCD(Vx);
+                // BCD V2
+                case "BCD":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF033 | (vIndex << 8));
+                }
+
+                // FX55	MEM	reg_dump(Vx,&I)	Stores V0 to VX (including VX) in memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
+                // STOR V2
+                case "STOR":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF055 | (vIndex << 8));
+                }
+
+                // FX65	MEM	reg_load(Vx,&I)	Fills V0 to VX (including VX) with values from memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
+                // READ V2
+                case "READ":
+                {
+                    var vIndex = ParseRegisterIndex(operand1);
+                    return (UInt16)(0xF065 | (vIndex << 8));
+                }
+
+                // Debugging: Causes the emulator to invoke the platform's (dotnet) debugger.
+                // DBRK
+                case "DBRK":
+                {
+                    return (UInt16)(0xFFFE);
+                }
+
+                // Debugging: Causes the emulator write the current timestamp to the platform's (dotnet) console.
+                // DPRN
+                case "DPRN":
+                {
+                    return (UInt16)(0xFFFF);
+                }
+
                 default:
                     throw new NotImplementedException($"No implementation defined for the {instruction} instruction.");
             }
@@ -496,20 +645,42 @@ namespace JustinCredible.c8asm
             return Convert.ToByte(operand.Substring(1), 16);
         }
 
-        private static byte ParseLiteralValue(string operand)
+        private static byte ParseLiteralByteValue(string operand)
         {
-            if (_hexLiteralValueRegEx.IsMatch(operand))
+            if (_hexLiteralByteValueRegEx.IsMatch(operand))
             {
                 // Hexidecimal
                 return Convert.ToByte(operand.Substring(1), 16);
             }
-            else if (_decLiteralValueRegEx.IsMatch(operand))
+            else if (_decLiteralByteValueRegEx.IsMatch(operand))
             {
                 // Decimal
                 return Convert.ToByte(operand, 10);
             }
             else
-                throw new Exception($"Unable to parse literal value '{operand}'.");
+                throw new Exception($"Unable to parse literal byte value '{operand}'.");
+        }
+
+        private static byte ParseLiteralNibbleValue(string operand)
+        {
+            if (_hexLiteralNibbleValueRegEx.IsMatch(operand))
+            {
+                // Hexidecimal
+                return Convert.ToByte(operand.Substring(1), 16);
+            }
+            else if (_decLiteralNibbleValueRegEx.IsMatch(operand))
+            {
+                // Decimal
+                var value = Convert.ToByte(operand, 10);
+
+                // The max value a nibble (4 bytes) can represent is F = 15.
+                if (value > 15)
+                    throw new OverflowException($"Unable to parse literal nibble value '{operand}' because it is greater than 15.");
+
+                return value;
+            }
+            else
+                throw new Exception($"Unable to parse literal nibble value '{operand}'.");
         }
     }
 }
