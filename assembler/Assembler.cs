@@ -310,7 +310,7 @@ namespace JustinCredible.c8asm
                 }
 
                 // 3XNN	Cond	if(Vx==NN)	Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block)
-                // SE V2, #2A
+                // SKE V2, #2A
                 case "SKE":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
@@ -319,7 +319,7 @@ namespace JustinCredible.c8asm
                 }
 
                 // 4XNN	Cond	if(Vx!=NN)	Skips the next instruction if VX doesn't equal NN. (Usually the next instruction is a jump to skip a code block)
-                // SNE V2, #2A
+                // SKNE V2, #2A
                 case "SKNE":
                 {
                     var vIndex = ParseRegisterIndex(operand1);
@@ -328,7 +328,7 @@ namespace JustinCredible.c8asm
                 }
 
                 // 5XY0	Cond	if(Vx==Vy)	Skips the next instruction if VX equals VY. (Usually the next instruction is a jump to skip a code block)
-                // SRE V2, V3
+                // SKRE V2, V3
                 case "SKRE":
                 {
                     var vIndex1 = ParseRegisterIndex(operand1);

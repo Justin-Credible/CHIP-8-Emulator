@@ -366,8 +366,8 @@ namespace JustinCredible.c8emu
                 // 8XY0	Assign	Vx=Vy	Sets VX to the value of VY.
                 var registerXIndex = (opcode & 0x0F00) >> 8;
                 var registerYIndex = (opcode & 0x00F0) >> 4;
-                var value = _registers[registerXIndex];
-                _registers[registerYIndex] = value;
+                var value = _registers[registerYIndex];
+                _registers[registerXIndex] = value;
             }
             else if ((opcode & 0xF00F) == 0x8001)
             {
