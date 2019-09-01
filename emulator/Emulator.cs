@@ -699,20 +699,24 @@ namespace JustinCredible.c8emu
 
         private UInt16 Fetch(UInt16 pointer)
         {
+            // First Byte Example Pattern: AAAAAAAA
             var firstByte = _memory[pointer];
+
+            // Second Byte Example Pattern: BBBBBBBB
             var secondByte = _memory[pointer + 1];
 
-            int combined = 0x0000;
+            // Expand the first byte to be twice as long and then shift
+            // the entire thing left 8 bits, which leaves the lower 8 bits
+            // as zeros so we can perform a logical OR with the second byte.
+            // AAAAAAAA 00000000
+            UInt16 firstByteExpanded = (UInt16)firstByte;
+            UInt16 firstByteShifted = (UInt16)(firstByteExpanded << 8);
 
-            combined = combined | secondByte;
-
-            int firstByteExpanded = (int)firstByte;
-
-            int firstByteShifted = firstByteExpanded << 8;
-
-            combined = combined | firstByteShifted;
-
-            return (UInt16)combined;
+            //     AAAAAAAA 00000000  (first byte, expanded into two bytes, shifted left 8 bits)
+            // OR           BBBBBBBB  (second byte)
+            //     -----------------
+            //     AAAAAAAA BBBBBBBB  (result: logical OR combines them)
+            return (UInt16)(firstByteShifted | secondByte);
         }
 
         private void UpdateTimer(double elapsedMilliseconds)
