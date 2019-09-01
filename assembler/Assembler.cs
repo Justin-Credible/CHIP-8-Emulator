@@ -8,7 +8,7 @@ namespace JustinCredible.c8asm
     {
         private static readonly Regex _labelRegEx = new Regex("([A-Za-z_]+):");
         private static readonly Regex _dataHexRegEx = new Regex("DW #([0-9A-F]{4})");
-        private static readonly Regex _dataBinaryRegEx = new Regex("DB $([01.]{8})");
+        private static readonly Regex _dataBinaryRegEx = new Regex("DB \\$([01.]{8})");
 
         private static readonly Regex _instructionRegEx = new Regex("^(?'inst'[A-Za-z]+)(?:\\s+(?'opand1'[A-Za-z0-9#$_]+)(?:,\\s+(?'opand2'[A-Za-z0-9#$_]+)(?:,\\s+(?'opand3'[A-Za-z0-9#$_]+))?)?)?$");
         private static readonly Regex _addressRegEx = new Regex("^\\$[0-9A-F]{3}$");
@@ -100,12 +100,29 @@ namespace JustinCredible.c8asm
                     
                     labels.Add(label, pointer);
                 }
-                else if (IsInstruction(sourceLine) || IsData(sourceLine))
+                else if (IsInstruction(sourceLine))
                 {
-                    // If this is a valid instruction or data that will be embedded in the ROM,
+                    // If this is a valid instruction that will be embedded in the ROM,
                     // then increment the pointer to account for it, and continue on.
                     pointer += 2;
                     continue;
+                }
+                else if (IsData(sourceLine))
+                {
+                    // Depending on the mnemonic used, the data can be different sizes.
+                    ushort dataSize = 0;
+
+                    try
+                    {
+                        dataSize = (ushort)GetDataSizeInBytes(sourceLine);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"Error calculating data size on line {lineNumber}.", ex);
+                    }
+
+                    // Increment the pointer to account for the size of the data.
+                    pointer += dataSize;
                 }
                 else
                 {
@@ -167,11 +184,9 @@ namespace JustinCredible.c8asm
                         throw new Exception($"An error occurred while assembling data '{sourceLine}' on line {lineNumber}.", exception);
                     }
 
-                    // Write out each of the bytes, incrementing the poitner once for each byte.
+                    // Write out each of the bytes.
                     foreach (byte singleByte in bytes)
                     {
-                        // rom[pointer] = singleByte;
-                        // pointer += 1;
                         rom.Add(singleByte);
                     }
 
@@ -218,6 +233,19 @@ namespace JustinCredible.c8asm
         private static bool IsData(string sourceLine)
         {
             return _dataHexRegEx.IsMatch(sourceLine) || _dataBinaryRegEx.IsMatch(sourceLine);
+        }
+
+        private static int GetDataSizeInBytes(string sourceLine)
+        {
+            if (!IsData(sourceLine))
+                throw new Exception("Cannot compute data size for a non-data source line.");
+
+            if (_dataHexRegEx.IsMatch(sourceLine))
+                return 2;
+            else if (_dataBinaryRegEx.IsMatch(sourceLine))
+                return 1;
+            else
+                throw new NotImplementedException("Unhandled data instruction size.");
         }
 
         public static UInt16 AssembleInstruction(string sourceLine, Dictionary<string, UInt16> labels)

@@ -595,11 +595,340 @@ namespace JustinCredible.c8emu.Tests
             Assert.Equal(0, state.Registers[15]); // MSB before shift was 0
         }
 
+        [Fact]
+        public void Opcode_9XY0_SkipsNextInstruction()
+        {
+            var source = @"
+                LOAD V1, #AE
+                LOAD V2, #AF
+                SKRNE V1, V2
+                LOAD VF, 1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(174, state.Registers[1]);
+            Assert.Equal(175, state.Registers[2]);
+            Assert.Equal(0, state.Registers[15]);
+        }
+
+        [Fact]
+        public void Opcode_9XY0_DoesntSkipNextInstruction()
+        {
+            var source = @"
+                LOAD V1, #AE
+                LOAD V2, #AE
+                SKRNE V1, V2
+                LOAD VF, 1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(174, state.Registers[1]);
+            Assert.Equal(174, state.Registers[2]);
+            Assert.Equal(1, state.Registers[15]);
+        }
+
+        [Fact]
+        public void Opcode_ANNN_SetsRegisterI()
+        {
+            var source = @"
+                LOADI $123
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (1 * 2), state.ProgramCounter);
+            Assert.Equal(291, state.IndexRegister);
+        }
+
+        [Fact]
+        public void Opcode_ANNN_SetsRegisterIWithLabel()
+        {
+            var source = String.Join(Environment.NewLine, new string[]
+            {
+                "LOADI MY_DATA",    // $200
+                "RTS",              // $202
+                "MY_DATA:",         // $204 (516 dec)
+            });
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (1 * 2), state.ProgramCounter);
+            Assert.Equal(516, state.IndexRegister);
+        }
+
+        [Fact]
+        public void Opcode_BNNN_JumpsWithWithNoOffset()
+        {
+            var source = @"
+                LOAD V0, 0  ; $200
+                JUMPI $208  ; $202
+                LOAD V1, 1  ; $204
+                LOAD V2, 1  ; $206
+                LOAD V3, 1  ; $208
+                LOAD V4, 1  ; $20A
+                LOAD V5, 1  ; $20C
+                LOAD V6, 1  ; $20E
+                RTS         ; $210
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (8 * 2), state.ProgramCounter);
+            Assert.Equal(0, state.Registers[0]);
+            Assert.Equal(0, state.Registers[1]);
+            Assert.Equal(0, state.Registers[2]);
+            Assert.Equal(1, state.Registers[3]);
+            Assert.Equal(1, state.Registers[4]);
+            Assert.Equal(1, state.Registers[5]);
+            Assert.Equal(1, state.Registers[6]);
+        }
+
+        [Fact]
+        public void Opcode_BNNN_JumpsWithWithOffset()
+        {
+            var source = @"
+                LOAD V0, 6  ; $200
+                JUMPI $208  ; $202
+                LOAD V1, 1  ; $204
+                LOAD V2, 1  ; $206
+                LOAD V3, 1  ; $208
+                LOAD V4, 1  ; $20A
+                LOAD V5, 1  ; $20C
+                LOAD V6, 1  ; $20E
+                RTS         ; $210
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (8 * 2), state.ProgramCounter);
+            Assert.Equal(6, state.Registers[0]);
+            Assert.Equal(0, state.Registers[1]);
+            Assert.Equal(0, state.Registers[2]);
+            Assert.Equal(0, state.Registers[3]);
+            Assert.Equal(0, state.Registers[4]);
+            Assert.Equal(0, state.Registers[5]);
+            Assert.Equal(1, state.Registers[6]);
+        }
+
+        [Fact]
+        public void Opcode_CXNN_GeneratesRandomWithFFMask()
+        {
+            var source = @"
+                RAND V0, #FF
+                RTS
+            ";
+
+            // Ensure the random number generator is initialized with the
+            // same seed during the test so we get the same result each run.
+            // Seed 123 will generate the number 3 on the first run.
+            var seed = 123;
+
+            var state = Execute(source, seed);
+
+            Assert.Equal(0x200 + (1 * 2), state.ProgramCounter);
+            Assert.Equal(3, state.Registers[0]);
+        }
+
+        [Fact]
+        public void Opcode_CXNN_GeneratesRandomWith00Mask()
+        {
+            var source = @"
+                RAND V0, #00
+                RTS
+            ";
+
+            // Ensure the random number generator is initialized with the
+            // same seed during the test so we get the same result each run.
+            // Seed 123 will generate the number 3 on the first run.
+            var seed = 123;
+
+            var state = Execute(source, seed);
+
+            Assert.Equal(0x200 + (1 * 2), state.ProgramCounter);
+            Assert.Equal(0, state.Registers[0]);
+        }
+
+        [Fact]
+        public void Opcode_CXNN_GeneratesRandomWithMask()
+        {
+            var source = @"
+                RAND V0, #5D
+                RTS
+            ";
+
+            // Ensure the random number generator is initialized with the
+            // same seed during the test so we get the same result each run.
+            // Seed 123 will generate the number 143 on the first run.
+            var seed = 4673;
+
+            // 143  #8F     10001111        (first random number)
+            //  93  #5D     01011101        (bitmask from opcode)
+            //                AND
+            //  13  #0D     00001101        (result expected in v0)
+
+            var state = Execute(source, seed);
+
+            Assert.Equal(0x200 + (1 * 2), state.ProgramCounter);
+            Assert.Equal(13, state.Registers[0]);
+        }
+
+        [Fact]
+        public void Opcode_DXYN_DrawsSprite()
+        {
+            var source = @"
+                LOAD VF, #AA    ; $200
+                LOADI SPRITE    ; $202
+                LOAD V0, 10     ; $204
+                LOAD V1, 5      ; $206
+                DRAW V0, V1, 4  ; $208
+                RTS             ; $20A
+                SPRITE:         ; $20C
+                DB $..111111    ; (10, 5) to (17, 5)
+                DB $.....1..    ; (10, 6) to (17, 6)
+                DB $.1...1..    ; (10, 7) to (17, 7)
+                DB $.11111..    ; (10, 8) to (17, 8)
+            ";
+
+            var bytes = c8asm.Utilities.FormatAsOpcodeGroups(Assembler.AssembleSource(source));
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (5 * 2), state.ProgramCounter);
+            Assert.Equal(0x20C, state.IndexRegister);
+            Assert.Equal(0, state.Registers[15]); // No collision detected
+
+            // First row (10, 5) to (17, 5)
+            Assert.Equal(0, state.FrameBuffer[10, 5]);
+            Assert.Equal(0, state.FrameBuffer[11, 5]);
+            Assert.Equal(1, state.FrameBuffer[12, 5]);
+            Assert.Equal(1, state.FrameBuffer[13, 5]);
+            Assert.Equal(1, state.FrameBuffer[14, 5]);
+            Assert.Equal(1, state.FrameBuffer[15, 5]);
+            Assert.Equal(1, state.FrameBuffer[16, 5]);
+            Assert.Equal(1, state.FrameBuffer[17, 5]);
+
+            // Second row (10, 6) to (17, 6)
+            Assert.Equal(0, state.FrameBuffer[10, 6]);
+            Assert.Equal(0, state.FrameBuffer[11, 6]);
+            Assert.Equal(0, state.FrameBuffer[12, 6]);
+            Assert.Equal(0, state.FrameBuffer[13, 6]);
+            Assert.Equal(0, state.FrameBuffer[14, 6]);
+            Assert.Equal(1, state.FrameBuffer[15, 6]);
+            Assert.Equal(0, state.FrameBuffer[16, 6]);
+            Assert.Equal(0, state.FrameBuffer[17, 6]);
+
+            // Third row (10, 7) to (17, 7)
+            Assert.Equal(0, state.FrameBuffer[10, 7]);
+            Assert.Equal(1, state.FrameBuffer[11, 7]);
+            Assert.Equal(0, state.FrameBuffer[12, 7]);
+            Assert.Equal(0, state.FrameBuffer[13, 7]);
+            Assert.Equal(0, state.FrameBuffer[14, 7]);
+            Assert.Equal(1, state.FrameBuffer[15, 7]);
+            Assert.Equal(0, state.FrameBuffer[16, 7]);
+            Assert.Equal(0, state.FrameBuffer[17, 7]);
+
+            // Fourth row (10, 8) to (17, 8)
+            Assert.Equal(0, state.FrameBuffer[10, 8]);
+            Assert.Equal(1, state.FrameBuffer[11, 8]);
+            Assert.Equal(1, state.FrameBuffer[12, 8]);
+            Assert.Equal(1, state.FrameBuffer[13, 8]);
+            Assert.Equal(1, state.FrameBuffer[14, 8]);
+            Assert.Equal(1, state.FrameBuffer[15, 8]);
+            Assert.Equal(0, state.FrameBuffer[16, 8]);
+            Assert.Equal(0, state.FrameBuffer[17, 8]);
+        }
+
+        [Fact]
+        public void Opcode_DXYN_DrawsSpriteWithCollisions()
+        {
+            var source = @"
+                LOAD VF, #AA    ; $200
+                LOADI SPRITE    ; $202
+                LOAD V0, 10     ; $204
+                LOAD V1, 5      ; $206
+                DRAW V0, V1, 4  ; $208
+                LOADI MASK      ; $20A
+                DRAW V0, V1, 4  ; $20C
+                RTS             ; $20E
+                SPRITE:         ; $210
+                DB $..111111    ; (10, 5) to (17, 5)
+                DB $.....1..    ; (10, 6) to (17, 6)    $211
+                DB $.1...1..    ; (10, 7) to (17, 7)    $212
+                DB $.11111..    ; (10, 8) to (17, 8)    $213
+                MASK:           ; $214
+                DB $..111111
+                DB $........
+                DB $........
+                DB $11111111
+            ";
+
+            var bytes = c8asm.Utilities.FormatAsOpcodeGroups(Assembler.AssembleSource(source));
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (7 * 2), state.ProgramCounter);
+            Assert.Equal(0x214, state.IndexRegister);
+            Assert.Equal(1, state.Registers[15]); // Collision detected
+
+            // First row (10, 5) to (17, 5)
+            Assert.Equal(0, state.FrameBuffer[10, 5]);
+            Assert.Equal(0, state.FrameBuffer[11, 5]);
+            Assert.Equal(0, state.FrameBuffer[12, 5]);
+            Assert.Equal(0, state.FrameBuffer[13, 5]);
+            Assert.Equal(0, state.FrameBuffer[14, 5]);
+            Assert.Equal(0, state.FrameBuffer[15, 5]);
+            Assert.Equal(0, state.FrameBuffer[16, 5]);
+            Assert.Equal(0, state.FrameBuffer[17, 5]);
+
+            // Second row (10, 6) to (17, 6)
+            Assert.Equal(0, state.FrameBuffer[10, 6]);
+            Assert.Equal(0, state.FrameBuffer[11, 6]);
+            Assert.Equal(0, state.FrameBuffer[12, 6]);
+            Assert.Equal(0, state.FrameBuffer[13, 6]);
+            Assert.Equal(0, state.FrameBuffer[14, 6]);
+            Assert.Equal(1, state.FrameBuffer[15, 6]);
+            Assert.Equal(0, state.FrameBuffer[16, 6]);
+            Assert.Equal(0, state.FrameBuffer[17, 6]);
+
+            // Third row (10, 7) to (17, 7)
+            Assert.Equal(0, state.FrameBuffer[10, 7]);
+            Assert.Equal(1, state.FrameBuffer[11, 7]);
+            Assert.Equal(0, state.FrameBuffer[12, 7]);
+            Assert.Equal(0, state.FrameBuffer[13, 7]);
+            Assert.Equal(0, state.FrameBuffer[14, 7]);
+            Assert.Equal(1, state.FrameBuffer[15, 7]);
+            Assert.Equal(0, state.FrameBuffer[16, 7]);
+            Assert.Equal(0, state.FrameBuffer[17, 7]);
+
+            // Fourth row (10, 8) to (17, 8)
+            Assert.Equal(1, state.FrameBuffer[10, 8]);
+            Assert.Equal(0, state.FrameBuffer[11, 8]);
+            Assert.Equal(0, state.FrameBuffer[12, 8]);
+            Assert.Equal(0, state.FrameBuffer[13, 8]);
+            Assert.Equal(0, state.FrameBuffer[14, 8]);
+            Assert.Equal(0, state.FrameBuffer[15, 8]);
+            Assert.Equal(1, state.FrameBuffer[16, 8]);
+            Assert.Equal(1, state.FrameBuffer[17, 8]);
+        }
+
         private UnitTestEmulatorState Execute(string source)
+        {
+            return Execute(source, -1);
+        }
+
+        private UnitTestEmulatorState Execute(string source, int seed)
         {
             var rom = Assembler.AssembleSource(source);
 
             var emulator = new Emulator();
+            emulator.Reset(seed);
             emulator.LoadRom(rom);
 
             var iteration = 0;

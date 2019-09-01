@@ -123,6 +123,63 @@ namespace JustinCredible.c8asm.Tests
             Assert.Equal(expected, rom);
         }
 
-        // TODO: Test DW and DB
+        [Fact]
+        public void EnsureDataAndLabelsAreResolvedCorrectly()
+        {
+            var source = @"
+                LOAD VF, #AA    ; $200
+                LOADI SPRITE    ; $202
+                LOAD V0, 10     ; $204
+                LOAD V1, 5      ; $206
+                DRAW V0, V1, 4  ; $208
+                LOADI MASK      ; $20A
+                DRAW V0, V1, 4  ; $20C
+                RTS             ; $20E
+                SPRITE:         ; $210
+                DB $..111111    ;       Hex Value: #3F
+                DB $.....1..    ; $211  Hex Value: #04
+                DB $.1...1..    ; $212  Hex Value: #44
+                DB $.11111..    ; $213  Hex Value: #7C
+                MASK:           ; $214
+                ;DB $..111111
+                ;DB $........
+                ;DB $........
+                ;DB $11111111
+                DW #3F00        ; Use hex equivalent to binary above
+                DW #00FF        ; $216
+            ";
+
+            var rom = Assembler.AssembleSource(source);
+
+            // NOTE: Below you'll see subtraction of 0x200 to since we haven't loaded into RAM yet,
+            // this is the ROM address on disk.
+
+            // First check that the labels resolved correctly.
+
+            // LOADI SPRITE at $200
+            // SPRITE label is at $210
+            // ANNN => 0xA210
+            Assert.Equal(0xA2, rom[0x202 - 0x200]);
+            Assert.Equal(0x10, rom[0x203 - 0x200]);
+
+            // LOADI MASK at $20A
+            // MASK label is at $214
+            // ANNN => 0xA214
+            // Subtract 0x200 to since we haven't loaded into RAM yet, this is the ROM address on disk.
+            Assert.Equal(0xA2, rom[0x20A - 0x200]);
+            Assert.Equal(0x14, rom[0x20B - 0x200]);
+
+            // Check binary data inserted correctly.
+            Assert.Equal(0x3F, rom[0x210 - 0x200]);
+            Assert.Equal(0x04, rom[0x211 - 0x200]);
+            Assert.Equal(0x44, rom[0x212 - 0x200]);
+            Assert.Equal(0x7C, rom[0x213 - 0x200]);
+
+            // Check hex data inserted correctly.
+            Assert.Equal(0x3F, rom[0x214 - 0x200]);
+            Assert.Equal(0x00, rom[0x215 - 0x200]);
+            Assert.Equal(0x00, rom[0x216 - 0x200]);
+            Assert.Equal(0xFF, rom[0x217 - 0x200]);
+        }
     }
 }

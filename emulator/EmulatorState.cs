@@ -11,5 +11,6 @@ namespace JustinCredible.c8emu
         public UInt16 IndexRegister { get; set; }
         public UInt16 ProgramCounter { get; set; }
         public UInt16 StackPointer { get; set; }
+        public byte[,] FrameBuffer { get; set; }
     }
 }

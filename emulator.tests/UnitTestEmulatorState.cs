@@ -16,6 +16,7 @@ namespace JustinCredible.c8emu
             this.IndexRegister = state.IndexRegister;
             this.ProgramCounter = state.ProgramCounter;
             this.StackPointer = state.StackPointer;
+            this.FrameBuffer = state.FrameBuffer;
         }
     }
 }

@@ -66,6 +66,11 @@ namespace JustinCredible.c8emu
 
         public void Reset()
         {
+            Reset(-1);
+        }
+
+        public void Reset(int seed)
+        {
             // Initialize the regisgters and memory.
             _indexRegister = 0x00;
             _registers = new byte[16];
@@ -79,7 +84,10 @@ namespace JustinCredible.c8emu
             _stackPointer = MIN_STACK;
 
             // Initialize the native random object which is used by the CXNN (Rand) opcode.
-            _random = new Random();
+            if (seed == -1)
+                _random = new Random();
+            else
+                _random = new Random(seed);
 
             // Reset the delay timer.
             _delayTimer = 0x00;
@@ -135,6 +143,7 @@ namespace JustinCredible.c8emu
                 ProgramCounter = _programCounter,
                 StackPointer = _stackPointer,
                 IndexRegister = _indexRegister,
+                FrameBuffer = FrameBuffer,
             };
         }
 
@@ -214,7 +223,7 @@ namespace JustinCredible.c8emu
             // X and Y: 4-bit register identifier
             // PC : Program Counter
             // I : 16bit register (For memory address) (Similar to void pointer)
-            // VN: One of the 16 available variables. N may be 0 to F (hexadecimal)
+            // VN: One of the 16 available variables (registers). N may be 0 to F (hexadecimal)
 
             // Decode and execute opcode.
             // There are 30 opcodes; each is two bytes and stored big-endian.
