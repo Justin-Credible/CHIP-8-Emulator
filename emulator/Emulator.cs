@@ -422,7 +422,7 @@ namespace JustinCredible.c8emu
                 var valueY = _registers[registerYIndex];
 
                 var borrowOccurred = valueY > valueX;
-                _registers[15] = (byte)(borrowOccurred ? 0x01 : 0x00);
+                _registers[15] = (byte)(borrowOccurred ? 0x00 : 0x01);
 
                 var result = valueX - valueY;
 
@@ -450,7 +450,7 @@ namespace JustinCredible.c8emu
                 var valueY = _registers[registerYIndex];
 
                 var borrowOccurred = valueX > valueY;
-                _registers[15] = (byte)(borrowOccurred ? 0x01 : 0x00);
+                _registers[15] = (byte)(borrowOccurred ? 0x00 : 0x01);
 
                 var result = valueY - valueX;
 
@@ -467,7 +467,7 @@ namespace JustinCredible.c8emu
                 var registerYIndex = (opcode & 0x00F0) >> 4;
                 var valueY = _registers[registerYIndex];
                 _registers[registerXIndex] = (byte)(valueY << 1);
-                _registers[15] = (byte)(valueY & 0x80);
+                _registers[15] = (byte)((valueY & 0x80) == 128 ? 1 : 0);
             }
             else if ((opcode & 0xF00F) == 0x9000)
             {

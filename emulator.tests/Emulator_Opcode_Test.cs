@@ -365,8 +365,6 @@ namespace JustinCredible.c8emu.Tests
                 RTS
             ";
 
-            var bytes = c8asm.Utilities.FormatAsOpcodeGroups(Assembler.AssembleSource(source));
-
             var state = Execute(source);
 
             Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
@@ -386,14 +384,215 @@ namespace JustinCredible.c8emu.Tests
                 RTS
             ";
 
-            var bytes = c8asm.Utilities.FormatAsOpcodeGroups(Assembler.AssembleSource(source));
-
             var state = Execute(source);
 
             Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
             Assert.Equal(239, state.Registers[1]);
             Assert.Equal(183, state.Registers[2]);
             Assert.Equal(1, state.Registers[15]); // overflow/carry occurred
+        }
+
+        [Fact]
+        public void Opcode_8XY5_SubtractsWithoutBorrow()
+        {
+            var source = @"
+                LOAD V1, 87
+                LOAD V2, 41
+                LOAD VF, #AA
+                SUB V1, V2
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(46, state.Registers[1]);
+            Assert.Equal(41, state.Registers[2]);
+            Assert.Equal(1, state.Registers[15]); // no borrow
+        }
+
+        [Fact]
+        public void Opcode_8XY5_SubtractsWithBorrow()
+        {
+            var source = @"
+                LOAD V1, 41
+                LOAD V2, 87
+                LOAD VF, #AA
+                SUB V1, V2
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(210, state.Registers[1]);
+            Assert.Equal(87, state.Registers[2]);
+            Assert.Equal(0, state.Registers[15]); // borrow
+        }
+
+        [Fact]
+        public void Opcode_8XY6_ShiftsRightWith1LSB()
+        {
+            // 41: 101001
+            // 41 >> 1: 010100 = 20
+            var source = @"
+                LOAD V1, 41
+                LOAD V2, #AA
+                LOAD VF, #AA
+                SHR V2, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(41, state.Registers[1]);
+            Assert.Equal(20, state.Registers[2]);
+            Assert.Equal(1, state.Registers[15]); // LSB before shift was 1
+        }
+
+        [Fact]
+        public void Opcode_8XY6_ShiftsRightWith0LSB()
+        {
+            // 40: 101000
+            // 41 >> 1: 010100 = 20
+            var source = @"
+                LOAD V1, 40
+                LOAD V2, #AA
+                LOAD VF, #AA
+                SHR V2, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(40, state.Registers[1]);
+            Assert.Equal(20, state.Registers[2]);
+            Assert.Equal(0, state.Registers[15]); // LSB before shift was 0
+        }
+
+
+        [Fact]
+        public void Opcode_8XY6_ShiftsRightOnSameRegister()
+        {
+            // 41: 101001
+            // 41 >> 1: 010100 = 20
+            var source = @"
+                LOAD V1, 41
+                LOAD V2, #AA
+                LOAD VF, #AA
+                SHR V1, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(20, state.Registers[1]);
+            Assert.Equal(170, state.Registers[2]);
+            Assert.Equal(1, state.Registers[15]); // LSB before shift was 1
+        }
+
+        [Fact]
+        public void Opcode_8XY7_SubtractsWithoutBorrow()
+        {
+            var source = @"
+                LOAD V1, 87
+                LOAD V2, 41
+                LOAD VF, #AA
+                SUBN V2, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(87, state.Registers[1]);
+            Assert.Equal(46, state.Registers[2]);
+            Assert.Equal(1, state.Registers[15]); // no borrow
+        }
+
+        [Fact]
+        public void Opcode_8XY7_SubtractsWithBorrow()
+        {
+            var source = @"
+                LOAD V1, 41
+                LOAD V2, 87
+                LOAD VF, #AA
+                SUBN V2, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(41, state.Registers[1]);
+            Assert.Equal(210, state.Registers[2]);
+            Assert.Equal(0, state.Registers[15]); // borrow
+        }
+
+        [Fact]
+        public void Opcode_8XY6_ShiftsLeftWith1MSB()
+        {
+            // 169: 10101001 #A6
+            // 169 << 1: 01010010 = 82 #52
+            var source = @"
+                LOAD V1, 169
+                LOAD V2, #AA
+                LOAD VF, #AA
+                SHL V2, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(169, state.Registers[1]);
+            Assert.Equal(82, state.Registers[2]);
+            Assert.Equal(1, state.Registers[15]); // MSB before shift was 1
+        }
+
+        [Fact]
+        public void Opcode_8XY6_ShiftsLeftWith0MSB()
+        {
+            // 41: 00101001 #29
+            // 41 << 1: 01010010 = 82 #52
+            var source = @"
+                LOAD V1, 41
+                LOAD V2, #AA
+                LOAD VF, #AA
+                SHL V2, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(41, state.Registers[1]);
+            Assert.Equal(82, state.Registers[2]);
+            Assert.Equal(0, state.Registers[15]); // MSB before shift was 0
+        }
+
+        [Fact]
+        public void Opcode_8XYE_ShiftsLeftOnSameRegister()
+        {
+            // 41: 00101001 #29
+            // 41 << 1: 01010010 = 82 #52
+            var source = @"
+                LOAD V1, 41
+                LOAD V2, #AA
+                LOAD VF, #AA
+                SHL V1, V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (4 * 2), state.ProgramCounter);
+            Assert.Equal(82, state.Registers[1]);
+            Assert.Equal(170, state.Registers[2]);
+            Assert.Equal(0, state.Registers[15]); // MSB before shift was 0
         }
 
         private UnitTestEmulatorState Execute(string source)
