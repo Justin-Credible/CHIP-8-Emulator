@@ -796,8 +796,6 @@ namespace JustinCredible.c8emu.Tests
                 DB $.11111..    ; (10, 8) to (17, 8)
             ";
 
-            var bytes = c8asm.Utilities.FormatAsOpcodeGroups(Assembler.AssembleSource(source));
-
             var state = Execute(source);
 
             Assert.Equal(0x200 + (5 * 2), state.ProgramCounter);
@@ -869,8 +867,6 @@ namespace JustinCredible.c8emu.Tests
                 DB $11111111
             ";
 
-            var bytes = c8asm.Utilities.FormatAsOpcodeGroups(Assembler.AssembleSource(source));
-
             var state = Execute(source);
 
             Assert.Equal(0x200 + (7 * 2), state.ProgramCounter);
@@ -918,12 +914,379 @@ namespace JustinCredible.c8emu.Tests
             Assert.Equal(1, state.FrameBuffer[17, 8]);
         }
 
-        private UnitTestEmulatorState Execute(string source)
+        [Fact]
+        public void Opcode_FX1E_AddsToI()
         {
-            return Execute(source, -1);
+            var source = @"
+                LOAD V1, #07
+                LOADI $123
+                ADDI V1
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (3 * 2), state.ProgramCounter);
+            Assert.Equal(0x7, state.Registers[1]);
+            Assert.Equal(0x12A, state.IndexRegister);
         }
 
-        private UnitTestEmulatorState Execute(string source, int seed)
+        /* TODO
+        [Fact]
+        public void Opcode_FX18_SetsSoundRegister()
+        {
+            var source = @"
+                LOAD V1, #07
+                LOADS V2
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (2 * 2), state.ProgramCounter);
+            Assert.Equal(0x07, state.Registers[1]);
+            Assert.Equal(0x07, state.SoundRegister);
+        }
+        */
+
+        [Theory]
+        [InlineData('0', 0x50)]
+        [InlineData('1', 0x55)]
+        [InlineData('2', 0x5A)]
+        [InlineData('3', 0x5F)]
+        [InlineData('4', 0x64)]
+        [InlineData('5', 0x69)]
+        [InlineData('6', 0x6E)]
+        [InlineData('7', 0x73)]
+        [InlineData('8', 0x78)]
+        [InlineData('9', 0x7D)]
+        [InlineData('A', 0x82)]
+        [InlineData('B', 0x87)]
+        [InlineData('C', 0x8C)]
+        [InlineData('D', 0x91)]
+        [InlineData('E', 0x96)]
+        [InlineData('F', 0x9B)]
+        public void Opcode_FX29_SetsSpriteForFontCharacter(char character, UInt16 expected)
+        {
+            var source = $@"
+                LOAD V2, #0{character}
+                LDSPR V2
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (2 * 2), state.ProgramCounter);
+            Assert.Equal(expected, state.IndexRegister);
+        }
+
+        [Fact]
+        public void Opcode_FX33_SetsBCDValue()
+        {
+            var source = @"
+                LOAD V2, 247
+                LOADI $2AA
+                BCD V2
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (3 * 2), state.ProgramCounter);
+            Assert.Equal(0xF7, state.Registers[2]);
+            Assert.Equal(0x2AA, state.IndexRegister);
+            Assert.Equal(0x02, state.Memory[0x2AA]);
+            Assert.Equal(0x04, state.Memory[0x2AB]);
+            Assert.Equal(0x07, state.Memory[0x2AC]);
+        }
+
+        [Fact]
+        public void Opcode_FX55_StoresAllRegisterValues()
+        {
+            var source = @"
+                LOAD V0, #DF
+                LOAD V1, #3F
+                LOAD V2, #25
+                LOAD V3, #E6
+                LOAD V4, #CF
+                LOAD V5, #A6
+                LOAD V6, #1B
+                LOAD V7, #47
+                LOAD V8, #99
+                LOAD V9, #D8
+                LOAD VA, #8D
+                LOAD VB, #2E
+                LOAD VC, #C9
+                LOAD VD, #3D
+                LOAD VE, #11
+                LOAD VF, #87
+                LOADI $2AA
+                STOR VF
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (18 * 2), state.ProgramCounter);
+            Assert.Equal(0xDF, state.Registers[0]);
+            Assert.Equal(0x3F, state.Registers[1]);
+            Assert.Equal(0x25, state.Registers[2]);
+            Assert.Equal(0xE6, state.Registers[3]);
+            Assert.Equal(0xCF, state.Registers[4]);
+            Assert.Equal(0xA6, state.Registers[5]);
+            Assert.Equal(0x1B, state.Registers[6]);
+            Assert.Equal(0x47, state.Registers[7]);
+            Assert.Equal(0x99, state.Registers[8]);
+            Assert.Equal(0xD8, state.Registers[9]);
+            Assert.Equal(0x8D, state.Registers[10]);
+            Assert.Equal(0x2E, state.Registers[11]);
+            Assert.Equal(0xC9, state.Registers[12]);
+            Assert.Equal(0x3D, state.Registers[13]);
+            Assert.Equal(0x11, state.Registers[14]);
+            Assert.Equal(0x87, state.Registers[15]);
+            Assert.Equal(0x2AA, state.IndexRegister);
+            Assert.Equal(0xDF, state.Memory[0x2AA]);
+            Assert.Equal(0x3F, state.Memory[0x2AB]);
+            Assert.Equal(0x25, state.Memory[0x2AC]);
+            Assert.Equal(0xE6, state.Memory[0x2AD]);
+            Assert.Equal(0xCF, state.Memory[0x2AE]);
+            Assert.Equal(0xA6, state.Memory[0x2AF]);
+            Assert.Equal(0x1B, state.Memory[0x2B0]);
+            Assert.Equal(0x47, state.Memory[0x2B1]);
+            Assert.Equal(0x99, state.Memory[0x2B2]);
+            Assert.Equal(0xD8, state.Memory[0x2B3]);
+            Assert.Equal(0x8D, state.Memory[0x2B4]);
+            Assert.Equal(0x2E, state.Memory[0x2B5]);
+            Assert.Equal(0xC9, state.Memory[0x2B6]);
+            Assert.Equal(0x3D, state.Memory[0x2B7]);
+            Assert.Equal(0x11, state.Memory[0x2B8]);
+            Assert.Equal(0x87, state.Memory[0x2B9]);
+        }
+
+        [Fact]
+        public void Opcode_FX55_StoresASubsetOfRegisterValues()
+        {
+            var source = @"
+                LOAD V0, #DF
+                LOAD V1, #3F
+                LOAD V2, #25
+                LOAD V3, #E6
+                LOAD V4, #CF
+                LOAD V5, #A6
+                LOAD V6, #1B
+                LOAD V7, #47
+                LOAD V8, #99
+                LOAD V9, #D8
+                LOAD VA, #8D
+                LOAD VB, #2E
+                LOAD VC, #C9
+                LOAD VD, #3D
+                LOAD VE, #11
+                LOAD VF, #87
+                LOADI $2AA
+                STOR V7
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (18 * 2), state.ProgramCounter);
+            Assert.Equal(0xDF, state.Registers[0]);
+            Assert.Equal(0x3F, state.Registers[1]);
+            Assert.Equal(0x25, state.Registers[2]);
+            Assert.Equal(0xE6, state.Registers[3]);
+            Assert.Equal(0xCF, state.Registers[4]);
+            Assert.Equal(0xA6, state.Registers[5]);
+            Assert.Equal(0x1B, state.Registers[6]);
+            Assert.Equal(0x47, state.Registers[7]);
+            Assert.Equal(0x99, state.Registers[8]);
+            Assert.Equal(0xD8, state.Registers[9]);
+            Assert.Equal(0x8D, state.Registers[10]);
+            Assert.Equal(0x2E, state.Registers[11]);
+            Assert.Equal(0xC9, state.Registers[12]);
+            Assert.Equal(0x3D, state.Registers[13]);
+            Assert.Equal(0x11, state.Registers[14]);
+            Assert.Equal(0x87, state.Registers[15]);
+            Assert.Equal(0x2AA, state.IndexRegister);
+            Assert.Equal(0xDF, state.Memory[0x2AA]);
+            Assert.Equal(0x3F, state.Memory[0x2AB]);
+            Assert.Equal(0x25, state.Memory[0x2AC]);
+            Assert.Equal(0xE6, state.Memory[0x2AD]);
+            Assert.Equal(0xCF, state.Memory[0x2AE]);
+            Assert.Equal(0xA6, state.Memory[0x2AF]);
+            Assert.Equal(0x1B, state.Memory[0x2B0]);
+            Assert.Equal(0x47, state.Memory[0x2B1]);
+            Assert.Equal(0x00, state.Memory[0x2B2]);
+            Assert.Equal(0x00, state.Memory[0x2B3]);
+            Assert.Equal(0x00, state.Memory[0x2B4]);
+            Assert.Equal(0x00, state.Memory[0x2B5]);
+            Assert.Equal(0x00, state.Memory[0x2B6]);
+            Assert.Equal(0x00, state.Memory[0x2B7]);
+            Assert.Equal(0x00, state.Memory[0x2B8]);
+            Assert.Equal(0x00, state.Memory[0x2B9]);
+        }
+
+        [Fact]
+        public void Opcode_FX65_ReadsAllRegisterValues()
+        {
+            var source = @"
+                LOAD V0, #DF
+                LOAD V1, #3F
+                LOAD V2, #25
+                LOAD V3, #E6
+                LOAD V4, #CF
+                LOAD V5, #A6
+                LOAD V6, #1B
+                LOAD V7, #47
+                LOAD V8, #99
+                LOAD V9, #D8
+                LOAD VA, #8D
+                LOAD VB, #2E
+                LOAD VC, #C9
+                LOAD VD, #3D
+                LOAD VE, #11
+                LOAD VF, #87
+                LOADI $2AA
+                STOR VF
+                LOAD V0, #00
+                LOAD V1, #00
+                LOAD V2, #00
+                LOAD V3, #00
+                LOAD V4, #00
+                LOAD V5, #00
+                LOAD V6, #00
+                LOAD V7, #00
+                LOAD V8, #00
+                LOAD V9, #00
+                LOAD VA, #00
+                LOAD VB, #00
+                LOAD VC, #00
+                LOAD VD, #00
+                LOAD VE, #00
+                LOAD VF, #00
+                READ VF
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (35 * 2), state.ProgramCounter);
+            Assert.Equal(0xDF, state.Registers[0]);
+            Assert.Equal(0x3F, state.Registers[1]);
+            Assert.Equal(0x25, state.Registers[2]);
+            Assert.Equal(0xE6, state.Registers[3]);
+            Assert.Equal(0xCF, state.Registers[4]);
+            Assert.Equal(0xA6, state.Registers[5]);
+            Assert.Equal(0x1B, state.Registers[6]);
+            Assert.Equal(0x47, state.Registers[7]);
+            Assert.Equal(0x99, state.Registers[8]);
+            Assert.Equal(0xD8, state.Registers[9]);
+            Assert.Equal(0x8D, state.Registers[10]);
+            Assert.Equal(0x2E, state.Registers[11]);
+            Assert.Equal(0xC9, state.Registers[12]);
+            Assert.Equal(0x3D, state.Registers[13]);
+            Assert.Equal(0x11, state.Registers[14]);
+            Assert.Equal(0x87, state.Registers[15]);
+            Assert.Equal(0x2AA, state.IndexRegister);
+            Assert.Equal(0xDF, state.Memory[0x2AA]);
+            Assert.Equal(0x3F, state.Memory[0x2AB]);
+            Assert.Equal(0x25, state.Memory[0x2AC]);
+            Assert.Equal(0xE6, state.Memory[0x2AD]);
+            Assert.Equal(0xCF, state.Memory[0x2AE]);
+            Assert.Equal(0xA6, state.Memory[0x2AF]);
+            Assert.Equal(0x1B, state.Memory[0x2B0]);
+            Assert.Equal(0x47, state.Memory[0x2B1]);
+            Assert.Equal(0x99, state.Memory[0x2B2]);
+            Assert.Equal(0xD8, state.Memory[0x2B3]);
+            Assert.Equal(0x8D, state.Memory[0x2B4]);
+            Assert.Equal(0x2E, state.Memory[0x2B5]);
+            Assert.Equal(0xC9, state.Memory[0x2B6]);
+            Assert.Equal(0x3D, state.Memory[0x2B7]);
+            Assert.Equal(0x11, state.Memory[0x2B8]);
+            Assert.Equal(0x87, state.Memory[0x2B9]);
+        }
+
+        [Fact]
+        public void Opcode_FX65_ReadsAllSubsetOfRegisterValues()
+        {
+            var source = @"
+                LOAD V0, #DF
+                LOAD V1, #3F
+                LOAD V2, #25
+                LOAD V3, #E6
+                LOAD V4, #CF
+                LOAD V5, #A6
+                LOAD V6, #1B
+                LOAD V7, #47
+                LOAD V8, #99
+                LOAD V9, #D8
+                LOAD VA, #8D
+                LOAD VB, #2E
+                LOAD VC, #C9
+                LOAD VD, #3D
+                LOAD VE, #11
+                LOAD VF, #87
+                LOADI $2AA
+                STOR VF
+                LOAD V0, #00
+                LOAD V1, #00
+                LOAD V2, #00
+                LOAD V3, #00
+                LOAD V4, #00
+                LOAD V5, #00
+                LOAD V6, #00
+                LOAD V7, #00
+                LOAD V8, #00
+                LOAD V9, #00
+                LOAD VA, #00
+                LOAD VB, #00
+                LOAD VC, #00
+                LOAD VD, #00
+                LOAD VE, #00
+                LOAD VF, #00
+                READ V7
+                RTS
+            ";
+
+            var state = Execute(source);
+
+            Assert.Equal(0x200 + (35 * 2), state.ProgramCounter);
+            Assert.Equal(0xDF, state.Registers[0]);
+            Assert.Equal(0x3F, state.Registers[1]);
+            Assert.Equal(0x25, state.Registers[2]);
+            Assert.Equal(0xE6, state.Registers[3]);
+            Assert.Equal(0xCF, state.Registers[4]);
+            Assert.Equal(0xA6, state.Registers[5]);
+            Assert.Equal(0x1B, state.Registers[6]);
+            Assert.Equal(0x47, state.Registers[7]);
+            Assert.Equal(0x00, state.Registers[8]);
+            Assert.Equal(0x00, state.Registers[9]);
+            Assert.Equal(0x00, state.Registers[10]);
+            Assert.Equal(0x00, state.Registers[11]);
+            Assert.Equal(0x00, state.Registers[12]);
+            Assert.Equal(0x00, state.Registers[13]);
+            Assert.Equal(0x00, state.Registers[14]);
+            Assert.Equal(0x00, state.Registers[15]);
+            Assert.Equal(0x2AA, state.IndexRegister);
+            Assert.Equal(0xDF, state.Memory[0x2AA]);
+            Assert.Equal(0x3F, state.Memory[0x2AB]);
+            Assert.Equal(0x25, state.Memory[0x2AC]);
+            Assert.Equal(0xE6, state.Memory[0x2AD]);
+            Assert.Equal(0xCF, state.Memory[0x2AE]);
+            Assert.Equal(0xA6, state.Memory[0x2AF]);
+            Assert.Equal(0x1B, state.Memory[0x2B0]);
+            Assert.Equal(0x47, state.Memory[0x2B1]);
+            Assert.Equal(0x99, state.Memory[0x2B2]);
+            Assert.Equal(0xD8, state.Memory[0x2B3]);
+            Assert.Equal(0x8D, state.Memory[0x2B4]);
+            Assert.Equal(0x2E, state.Memory[0x2B5]);
+            Assert.Equal(0xC9, state.Memory[0x2B6]);
+            Assert.Equal(0x3D, state.Memory[0x2B7]);
+            Assert.Equal(0x11, state.Memory[0x2B8]);
+            Assert.Equal(0x87, state.Memory[0x2B9]);
+        }
+
+        private UnitTestEmulatorState Execute(string source, int seed = -1)
         {
             var rom = Assembler.AssembleSource(source);
 

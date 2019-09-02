@@ -64,12 +64,7 @@ namespace JustinCredible.c8emu
             this.Reset();
         }
 
-        public void Reset()
-        {
-            Reset(-1);
-        }
-
-        public void Reset(int seed)
+        public void Reset(int seed = -1)
         {
             // Initialize the regisgters and memory.
             _indexRegister = 0x00;
@@ -614,6 +609,9 @@ namespace JustinCredible.c8emu
             else if ((opcode & 0xF0FF) == 0xF018)
             {
                 // FX18	Sound	sound_timer(Vx)	Sets the sound timer to VX.
+                // var registerXIndex = (opcode & 0x0F00) >> 8;
+                // var valueX = _registers[registerXIndex];
+                // _soundRegister = (UInt16)(valueX);
                 // TODO
             }
             else if ((opcode & 0xF0FF) == 0xF01E)
@@ -654,37 +652,35 @@ namespace JustinCredible.c8emu
             {
                 // FX55	MEM	reg_dump(Vx,&I)	Stores V0 to VX (including VX) in memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
 
-                var registerXIndex = (opcode & 0x0F00) >> 8;
-                var valueX = _registers[registerXIndex];
-                var index = _indexRegister;
+                var dumpToIndex = (opcode & 0x0F00) >> 8;
+                var memoryIndex = _indexRegister;
 
-                for (var i = 0; i <= valueX; i++)
+                for (var i = 0; i <= dumpToIndex; i++)
                 {
                     var registerValue = _registers[i];
-                    _memory[index + i] = registerValue;
+                    _memory[memoryIndex + i] = registerValue;
                 }
 
                 // NOTE: Discrepancy between sources; this page indicates I is, in fact, modified after this operation.
                 // http://mattmik.com/files/chip8/mastering/chip8.html
-                _indexRegister = (UInt16)(_indexRegister + valueX + 1);
+                // _indexRegister = (UInt16)(_indexRegister + registerIndex + 1);
             }
             else if ((opcode & 0xF0FF) == 0xF065)
             {
                 // FX65	MEM	reg_load(Vx,&I)	Fills V0 to VX (including VX) with values from memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.
 
-                var registerXIndex = (opcode & 0x0F00) >> 8;
-                var valueX = _registers[registerXIndex];
-                var index = _indexRegister;
+                var restoreToIndex = (opcode & 0x0F00) >> 8;
+                var memoryIndex = _indexRegister;
 
-                for (var i = 0; i <= valueX; i++)
+                for (var i = 0; i <= restoreToIndex; i++)
                 {
-                    var registerValue = _memory[index + i];
+                    var registerValue = _memory[memoryIndex + i];
                     _registers[i] = registerValue;
                 }
 
                 // NOTE: Discrepancy between sources; this page indicates I is, in fact, modified after this operation.
                 // http://mattmik.com/files/chip8/mastering/chip8.html
-                _indexRegister = (UInt16)(_indexRegister + valueX + 1);
+                // _indexRegister = (UInt16)(_indexRegister + valueX + 1);
             }
             else if (opcode == 0xFFFE)
             {

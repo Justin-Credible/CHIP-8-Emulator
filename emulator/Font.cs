@@ -1,9 +1,10 @@
+using System;
 
 namespace JustinCredible.c8emu
 {
     public class Font
     {
-        public static readonly byte MemoryLocation = 0x050;
+        public static readonly UInt16 MemoryLocation = 0x50;
 
         // The built in font is stored in memory locations 0x050 through 0x0A0
         // Here is an example of how it is stored:
