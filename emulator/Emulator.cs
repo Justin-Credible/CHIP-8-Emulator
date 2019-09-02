@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace JustinCredible.c8emu
 {
@@ -171,7 +172,7 @@ namespace JustinCredible.c8emu
             Console.WriteLine($"vC: ${vC}\tvD: ${vD}\tvE: ${vE}\tvF: ${vF}\t");
         }
 
-        public void Step(double elapsedMilliseconds)
+        public void Step(double elapsedMilliseconds, Dictionary<byte, bool> keys = null)
         {
             // Sanity check.
             if (Finished)
@@ -302,7 +303,7 @@ namespace JustinCredible.c8emu
                 {
                     // Increment the program counter once for this instruction and a second
                     // time because of the outcome of this opcode.
-                    _programCounter = (UInt16)(_programCounter + 0x0004);
+                    _programCounter += 4;
 
                     // We've already adjusted it, so don't do it again below.
                     incrementProgramCounter = false;
@@ -319,7 +320,7 @@ namespace JustinCredible.c8emu
                 {
                     // Increment the program counter once for this instruction and a second
                     // time because of the outcome of this opcode.
-                    _programCounter = (UInt16)(_programCounter + 0x0004);
+                    _programCounter += 4;
 
                     // We've already adjusted it, so don't do it again below.
                     incrementProgramCounter = false;
@@ -337,7 +338,7 @@ namespace JustinCredible.c8emu
                 {
                     // Increment the program counter once for this instruction and a second
                     // time because of the outcome of this opcode.
-                    _programCounter = (UInt16)(_programCounter + 0x0004);
+                    _programCounter += 4;
 
                     // We've already adjusted it, so don't do it again below.
                     incrementProgramCounter = false;
@@ -485,7 +486,7 @@ namespace JustinCredible.c8emu
                 {
                     // Increment the program counter once for this instruction and a second
                     // time because of the outcome of this opcode.
-                    _programCounter = (UInt16)(_programCounter + 0x0004);
+                    _programCounter += 4;
 
                     // We've already adjusted it, so don't do it again below.
                     incrementProgramCounter = false;
@@ -582,12 +583,39 @@ namespace JustinCredible.c8emu
             else if ((opcode & 0xF0FF) == 0xE09E)
             {
                 // EX9E	KeyOp	if(key()==Vx)	Skips the next instruction if the key stored in VX is pressed. (Usually the next instruction is a jump to skip a code block)
-                // TODO
+
+                if (keys != null)
+                {
+                    var registerXIndex = (opcode & 0x0F00) >> 8;
+                    var valueX = _registers[registerXIndex];
+
+                    if (keys[valueX])
+                    {
+                        // Increment by two opcodes here; for this instruction as well as
+                        // the next because we're skipping it.
+                        _programCounter += 4;
+
+                        // We've already adjusted it, so don't do it again below.
+                        incrementProgramCounter = false;
+                    }
+                }
             }
             else if ((opcode & 0xF0FF) == 0xE0A1)
             {
                 // EXA1	KeyOp	if(key()!=Vx)	Skips the next instruction if the key stored in VX isn't pressed. (Usually the next instruction is a jump to skip a code block)
-                // TODO
+
+                var registerXIndex = (opcode & 0x0F00) >> 8;
+                var valueX = _registers[registerXIndex];
+
+                if (keys == null || !keys[valueX])
+                {
+                    // Increment by two opcodes here; for this instruction as well as
+                    // the next because we're skipping it.
+                    _programCounter += 4;
+
+                    // We've already adjusted it, so don't do it again below.
+                    incrementProgramCounter = false;
+                }
             }
             else if ((opcode & 0xF0FF) == 0xF007)
             {
@@ -699,7 +727,7 @@ namespace JustinCredible.c8emu
 
             // Increment program counter by two bytes, to the next opcode.
             if (incrementProgramCounter)
-                _programCounter = (UInt16)(_programCounter + 0x0002);
+                _programCounter += 2;
         }
 
         private UInt16 Fetch(UInt16 pointer)

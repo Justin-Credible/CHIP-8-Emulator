@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -28,6 +29,9 @@ namespace JustinCredible.c8emu
         private static byte[,] _frameBuffer;
         private static bool _renderFrameNextTick = false;
         private static bool _playSoundNextTick = false;
+
+        // Used to pass data from the GUI event loop to the emulator thread's loop.
+        private static Dictionary<byte, bool> _keys = null;
 
         public static void Main(string[] args)
         {
@@ -66,7 +70,7 @@ namespace JustinCredible.c8emu
 
             var romPathArg = command.Argument("[ROM path]", "The path to a ROM file to load.");
 
-            var speedOption = command.Option("-s|--speed", "Controls how fast the emulator should run (10 = regular speed, 1 = slowest speed)", CommandOptionType.SingleValue);
+            var speedOption = command.Option("-s|--speed", "Controls how fast the emulator should run (100 = max, 1 = min, 50 = default)", CommandOptionType.SingleValue);
             var debugOption = command.Option("-d|--debug", "Run in debug mode; Space Bar = Break, F10 = Step, F5 = Continue", CommandOptionType.NoValue);
             var breakOption = command.Option("-b|--break", "Breakpoint on startup; requires debug option to function.", CommandOptionType.NoValue);
             var performanceOption = command.Option("-p|--perfmon", "Performance monitor; write stats to the console while running.", CommandOptionType.NoValue);
@@ -81,14 +85,14 @@ namespace JustinCredible.c8emu
                 else
                     throw new Exception($"Could not locate a ROM file at path {romPathArg.Value}");
 
-                _speed = 10;
+                _speed = 50;
 
                 if (speedOption.HasValue())
                 {
                     bool parsed = int.TryParse(speedOption.Value(), out _speed);
 
-                    if (!parsed || _speed < 1 || _speed > 10)
-                        throw new Exception("Speed must be between 1 and 10, inclusive.");
+                    if (!parsed || _speed < 1 || _speed > 100)
+                        throw new Exception("Speed must be between 1 and 100, inclusive.");
                 }
 
                 if (debugOption.HasValue())
@@ -173,8 +177,7 @@ namespace JustinCredible.c8emu
 
                 stopwatch.Restart();
 
-                // TODO: Pass in pressed keys.
-                _emulator.Step(elapsedMilliseconds /*, _pressedKeys */);
+                _emulator.Step(elapsedMilliseconds, _keys);
 
                 if (_emulator.FrameBufferUpdated)
                 {
@@ -203,7 +206,7 @@ namespace JustinCredible.c8emu
 
         private static void GUI_OnTick(GUITickEventArgs eventArgs)
         {
-            // TODO: Save off pressed keys.
+            _keys = eventArgs.Keys;
 
             if (_renderFrameNextTick)
             {
@@ -233,18 +236,18 @@ namespace JustinCredible.c8emu
                 }
             }
 
-            if (_debug && eventArgs.keyDown != null)
+            if (_debug && eventArgs.KeyDown != null)
             {
-                if (eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_SPACE)
+                if (eventArgs.KeyDown == SDL2.SDL.SDL_Keycode.SDLK_SPACE)
                 {
                     _shouldBreak = true;
                 }
-                if (eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_F5)
+                else if (eventArgs.KeyDown == SDL2.SDL.SDL_Keycode.SDLK_F5)
                 {
                     _shouldStep = false;
                     _shouldBreak = false;
                 }
-                else if (eventArgs.keyDown == SDL2.SDL.SDL_Keycode.SDLK_F10)
+                else if (eventArgs.KeyDown == SDL2.SDL.SDL_Keycode.SDLK_F10)
                 {
                     _shouldStep = true;
                     _shouldBreak = false;

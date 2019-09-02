@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using SDL2;
 
 namespace JustinCredible.c8emu
@@ -6,7 +7,12 @@ namespace JustinCredible.c8emu
     class GUITickEventArgs : EventArgs
     {
         // Out
-        public SDL.SDL_Keycode? keyDown { get; set; }
+
+        // The state of the mapped keys; up or down; pre-mapped to emulator keys.
+        public Dictionary<byte, bool> Keys { get; set; }
+
+        // The keycode for a key that was pressed down _on this event loop tick only_.
+        public SDL.SDL_Keycode? KeyDown { get; set; }
 
         // In
         public byte[,] FrameBuffer { get; set; }
