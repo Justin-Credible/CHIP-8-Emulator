@@ -31,6 +31,19 @@
             "group": "build",
         },
         {
+            "label": "build c8emu.tests",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/emulator.tests/c8emu.tests.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
             "label": "build c8asm.tests",
             "command": "dotnet",
             "type": "process",
@@ -42,6 +55,22 @@
             ],
             "problemMatcher": "$msCompile",
             "group": "build"
+        },
+        {
+            "label": "run c8emu.tests",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/emulator.tests/c8emu.tests.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
         },
         {
             "label": "run c8asm.tests",
